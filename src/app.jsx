@@ -7,7 +7,7 @@ import {
   Briefcase, ChevronRight, Globe, Map, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench
+  Columns, Wrench, BarChart, Factory
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
 
@@ -214,6 +214,7 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
         if (serviceId) onStatusChange(serviceId, targetStatus);
     };
     const getServicesByStatus = (status) => {
+        // --- ORDEN CRONOLÓGICO ESTRICTO ---
         return services.filter(s => {
             if (status === 'No Finalizado') return s.estado === 'No Finalizado' || s.postergado;
             if (status === 'Agendado') return s.estado === 'Agendado' && !s.postergado;
@@ -249,25 +250,29 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const visibleServices = useMemo(() => {
         let base = services; 
         if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones'); } 
-        else { return base.filter(s => s.tipoTrabajo === 'Vacaciones'); }
+        else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones'); }
+        // mode = 'mixed' para técnicos (sin filtro, muestra todo)
+        return base;
     }, [services, mode]);
 
     if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros para mostrar.</div>;
     
-    // --- CAMBIO CLAVE: Inicio desde HOY (menos 1 día de margen) ---
+    // --- LÓGICA DE TIEMPO: HOY -1 DÍA HASTA +30 DÍAS (O MÁS SI HAY EVENTOS FUTUROS) ---
     const today = new Date();
     today.setHours(0,0,0,0);
     const minDate = new Date(today);
-    minDate.setDate(minDate.getDate() - 1); // Empezar ayer para dar contexto
+    minDate.setDate(minDate.getDate() - 1); 
 
-    // Calculamos el final basándonos en los servicios futuros o al menos 30 días vista
     const serviceEndDates = visibleServices.map(s => new Date(s.fFin));
     let maxDate = new Date(Math.max(...serviceEndDates, today.getTime()));
-    maxDate.setDate(maxDate.getDate() + 30); // Mostrar al menos 30 días hacia adelante
+    maxDate.setDate(maxDate.getDate() + 30); 
     
     const DAY_WIDTH = 50; 
-    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); // Mínimo 30 días de ancho
+    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); 
     const chartWidth = totalDays * DAY_WIDTH;
+
+    // --- ORDEN CRONOLÓGICO ESTRICTO ---
+    const sortedVisibleServices = [...visibleServices].sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
 
     return (
         <div className="bg-white/90 rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden backdrop-blur-sm relative flex flex-col h-[calc(100vh-200px)]">
@@ -279,7 +284,14 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
                       <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Cliente:</span> {selectedGanttService.cliente}</span></div>
                       <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Equipo:</span> {selectedGanttService.tecnicos.join(', ')}</span></div>
                       <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Ejecución:</span> {selectedGanttService.fInicio} al {selectedGanttService.fFin}</span></div>
-                      {/* CÁLCULO DE TIEMPO DE RESPUESTA EN EL POPUP */}
+                      
+                      {/* INFORMACIÓN ADICIONAL DEL TRAFO EN EL POPUP GANTT */}
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
+                          <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
+                          <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
+                          <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
+                      </div>
+
                       {selectedGanttService.fSolicitud && (
                           <div className="bg-orange-50 text-orange-700 p-2 rounded-lg font-bold text-center border border-orange-100">
                               ⏱️ Lead Time: {Math.max(0, Math.floor((new Date(selectedGanttService.fInicio) - new Date(selectedGanttService.fSolicitud)) / (1000 * 3600 * 24)))} días
@@ -304,15 +316,11 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
                   })}
                </div>
                <div className="pt-2">
-                   {visibleServices.map((srv, idx) => {
+                   {sortedVisibleServices.map((srv, idx) => {
                      const start = new Date(srv.fInicio);
-                     // Si el servicio termina antes de "ayer", no lo renderizamos o lo mostramos cortado
-                     if (new Date(srv.fFin) < minDate) return null;
+                     if (new Date(srv.fFin) < minDate) return null; // Ocultar pasados
 
                      let offsetDays = (start - minDate) / (1000 * 60 * 60 * 24);
-                     // Si empieza antes de la vista actual, ajustamos el inicio visualmente (aunque el cálculo sea negativo)
-                     // Recharts/CSS manejará el overflow hidden, pero mejor ser precisos:
-                     
                      const duration = (new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24) + 1;
                      const leftPos = offsetDays * DAY_WIDTH;
                      const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH); 
@@ -326,8 +334,7 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
                      );
                    })}
                </div>
-               {/* Línea indicadora del día actual */}
-               <div className="absolute top-0 bottom-0 pointer-events-none border-l-2 border-orange-400 z-0" style={{ left: `${48 * 4 + DAY_WIDTH}px` /* Ajuste aproximado visual, idealmente calculado */ }}></div>
+               <div className="absolute top-0 bottom-0 pointer-events-none border-l-2 border-orange-400 z-0" style={{ left: `${48 * 4 + DAY_WIDTH}px` }}></div>
                <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">{Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (<div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>))}</div>
              </div>
            </div>
@@ -335,7 +342,7 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     );
 };
 
-// --- COMPONENTE KPIs RESTAURADO Y COMPLETO ---
+// --- COMPONENTE KPIs COMPLETADO ---
 const KPIs = ({ services }) => {
     const [kpiYear, setKpiYear] = useState('all');
     const [kpiMonth, setKpiMonth] = useState('all');
@@ -354,25 +361,24 @@ const KPIs = ({ services }) => {
     const successRate = closedServices.length ? ((closedServices.filter(s => s.estado === 'Finalizado').length / closedServices.length) * 100).toFixed(0) : 0;
     const activeServicesCount = servicesForCalc.filter(s => s.estado === 'En Servicio').length;
     
-    // --- KPIs FALTANTES AGREGADOS ---
     const postponedCount = servicesForCalc.filter(s => s.postergado).length;
     const adherenceRate = totalServices ? (((totalServices - postponedCount) / totalServices) * 100).toFixed(0) : 0;
     const totalClaims = servicesForCalc.filter(s => s.tipoTrabajo === "Asistencia por reclamo").length;
     const qualityRate = totalServices ? (((totalServices - totalClaims) / totalServices) * 100).toFixed(1) : 100;
     
+    const cancelledCount = servicesForCalc.filter(s => s.estado === 'No Finalizado').length;
+    const cancellationRate = totalServices ? ((cancelledCount / totalServices) * 100).toFixed(1) : 0;
+
     let ownFleetUses = 0; let totalVehicleUses = 0;
     servicesForCalc.forEach(s => { s.vehiculos.forEach(v => { totalVehicleUses++; if (FLOTA_PROPIA.includes(v)) ownFleetUses++; }); });
     const ownFleetRate = totalVehicleUses ? ((ownFleetUses / totalVehicleUses) * 100).toFixed(0) : 0;
 
-    // TOP Clientes
     const clientMap = {}; servicesForCalc.forEach(s => { clientMap[s.cliente] = (clientMap[s.cliente] || 0) + 1; });
     const dataTopClients = Object.entries(clientMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 5);
 
-    // Carga Técnica
     const techLoadMap = {}; servicesForCalc.forEach(s => s.tecnicos.forEach(t => { techLoadMap[t] = (techLoadMap[t] || 0) + 1; }));
     const dataTechLoad = Object.entries(techLoadMap).map(([name, value]) => ({ name, value })).sort((a,b)=>b.value-a.value).slice(0,10);
 
-    // Cálculos de horas y tipos (Existente)
     let totalWorkHours = 0;
     let totalTravelHours = 0;
     servicesForCalc.forEach(s => {
@@ -397,8 +403,9 @@ const KPIs = ({ services }) => {
     const dataStatus = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
     const COLORS_STATUS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
 
-    // NUEVO CÁLCULO LEAD TIME POR MES
     const leadTimeByMonth = {};
+    const servicesByMonth = {}; 
+
     servicesForCalc.forEach(s => {
         if (s.fSolicitud && s.fInicio) {
             const d = new Date(s.fInicio);
@@ -407,21 +414,21 @@ const KPIs = ({ services }) => {
             if (!leadTimeByMonth[m]) leadTimeByMonth[m] = { total: 0, count: 0 };
             leadTimeByMonth[m].total += lead;
             leadTimeByMonth[m].count += 1;
+            servicesByMonth[m] = (servicesByMonth[m] || 0) + 1;
         }
     });
     const dataLeadTimeTrend = Object.entries(leadTimeByMonth).map(([name, data]) => ({
         name,
         avg: parseFloat((data.total / data.count).toFixed(1))
     }));
-    
-    // NUEVO CÁLCULO: PROM. DURACIÓN DE SERVICIO
+    const dataMonthlyVolume = Object.entries(servicesByMonth).map(([name, value]) => ({ name, value }));
+
     let totalServiceDuration = 0;
     servicesForCalc.forEach(s => {
         totalServiceDuration += (new Date(s.fFin) - new Date(s.fInicio)) / (1000 * 3600 * 24) + 1;
     });
     const avgDuration = totalServices ? (totalServiceDuration / totalServices).toFixed(1) : 0;
 
-    // NUEVO CÁLCULO: SERVICIOS POR TIPO
     const servicesByTypeMap = {};
     servicesForCalc.forEach(s => { servicesByTypeMap[s.tipoTrabajo] = (servicesByTypeMap[s.tipoTrabajo] || 0) + 1; });
     const dataServicesByType = Object.entries(servicesByTypeMap).map(([name, value]) => ({ name, value }));
@@ -437,8 +444,7 @@ const KPIs = ({ services }) => {
                 </div>
             </div>
             
-            {/* GRID DE KPIs PRINCIPALES (COMPLETO) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-5">
                 {[
                     { title: "Total Servicios", val: totalServices, unit: "", icon: Calendar, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100" },
                     { title: "En Ejecución", val: activeServicesCount, unit: "", icon: Zap, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
@@ -447,6 +453,7 @@ const KPIs = ({ services }) => {
                     { title: "Calidad (Sin Reclamos)", val: qualityRate, unit: "%", icon: ShieldCheck, color: "text-teal-600", bg: "bg-teal-50", border: "border-teal-100" },
                     { title: "Uso Flota Propia", val: ownFleetRate, unit: "%", icon: Truck, color: "text-sky-600", bg: "bg-sky-50", border: "border-sky-100" },
                     { title: "Prom. Duración", val: avgDuration, unit: "días", icon: Clock, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
+                    { title: "Tasa Cancelación", val: cancellationRate, unit: "%", icon: AlertOctagon, color: "text-red-600", bg: "bg-red-50", border: "border-red-100" },
                 ].map((k, i) => (
                     <div key={i} className={`bg-white p-5 rounded-2xl shadow-sm border ${k.border} hover:shadow-md transition-all duration-300 group`}>
                         <div className="flex justify-between items-start mb-3"><div className={`p-2.5 rounded-xl ${k.bg} ${k.color} group-hover:scale-110 transition-transform duration-300`}><k.icon className="w-5 h-5"/></div></div>
@@ -455,9 +462,7 @@ const KPIs = ({ services }) => {
                 ))}
             </div>
             
-            {/* GRÁFICOS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 {/* Lead Time Chart */}
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative col-span-2">
                     <div className="flex justify-between items-center mb-6"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><Clock className="w-4 h-4 mr-2 text-indigo-500"/> Tiempos de Respuesta (Lead Time)</h4><p className="text-[10px] text-slate-400 font-medium">Promedio de días desde Solicitud hasta Inicio por mes</p></div></div>
                     <div className="h-64">
@@ -473,7 +478,6 @@ const KPIs = ({ services }) => {
                     </div>
                 </div>
 
-                 {/* Hours Distribution */}
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
                     <div className="flex justify-between items-center mb-6 relative z-10"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><Timer className="w-4 h-4 mr-2 text-orange-500"/> Distribución Horaria</h4><p className="text-[10px] text-slate-400 font-medium">Horas Hombre (Productivas vs Viaje)</p></div></div>
                     <div className="h-64 relative z-10">
@@ -491,8 +495,35 @@ const KPIs = ({ services }) => {
                 </div>
             </div>
 
-            {/* FILA INFERIOR: Top Clientes, Carga Técnica y Servicios por Tipo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-80">
+                    <h4 className="font-bold text-slate-800 text-sm flex items-center mb-4"><BarChart className="w-4 h-4 mr-2 text-blue-500"/> Evolución Mensual de Servicios</h4>
+                    <ResponsiveContainer width="100%" height="85%">
+                        <RechartsBarChart data={dataMonthlyVolume}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:'#94a3b8', fontSize:11, fontWeight: 600}} dy={10}/>
+                            <YAxis axisLine={false} tickLine={false} tick={{fill:'#94a3b8', fontSize:11, fontWeight: 600}}/>
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '12px', border: 'none'}}/>
+                            <Bar dataKey="value" name="Servicios" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} />
+                        </RechartsBarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-80 relative overflow-hidden">
+                    <div className="flex justify-between items-center mb-2"><h4 className="font-bold text-slate-800 text-sm flex items-center"><Wrench className="w-4 h-4 mr-2 text-emerald-500"/> Servicios por Tipo</h4></div>
+                    <ResponsiveContainer width="100%" height="90%">
+                        <PieChart>
+                            <Pie data={dataServicesByType} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
+                                {dataServicesByType.map((entry, index) => (<Cell key={`cell-${index}`} fill={Object.values(COLORS_TRABAJO)[index % 10] || '#ccc'} />))}
+                            </Pie>
+                            <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: 'none'}}/>
+                            <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{fontSize: '10px'}}/>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-80">
                     <h4 className="font-bold text-slate-800 text-sm flex items-center mb-4"><UserCheck className="w-4 h-4 mr-2 text-pink-500"/> Top 5 Clientes</h4>
                     <ResponsiveContainer width="100%" height="85%">
@@ -515,35 +546,21 @@ const KPIs = ({ services }) => {
                         </RechartsBarChart>
                     </ResponsiveContainer>
                 </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-80 relative overflow-hidden">
-                    <div className="flex justify-between items-center mb-2"><h4 className="font-bold text-slate-800 text-sm flex items-center"><Wrench className="w-4 h-4 mr-2 text-emerald-500"/> Servicios por Tipo</h4></div>
-                    <ResponsiveContainer width="100%" height="90%">
-                        <PieChart>
-                            <Pie data={dataServicesByType} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
-                                {dataServicesByType.map((entry, index) => (<Cell key={`cell-${index}`} fill={Object.values(COLORS_TRABAJO)[index % 10] || '#ccc'} />))}
-                            </Pie>
-                            <Tooltip contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: 'none'}}/>
-                            <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{fontSize: '10px'}}/>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
             </div>
         </div>
     );
 };
 
-// --- EL RESTO DE LOS COMPONENTES (ServiceSheet, TransformerHistory, LoginScreen, App) PERMANECEN IGUAL ---
-// Nota: Para mantener la respuesta concisa, reutilizo los componentes definidos en el bloque anterior.
-// Solo asegúrate de que el componente KPIs actualizado reemplace al anterior.
-
-// ... (Copiar LoginScreen, TechPortal, TransformerHistory, ServiceSheet, KanbanBoard del bloque anterior) ...
-
-// ... (ServiceSheet)
 const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleDelete }) => {
+    // --- ORDEN CRONOLÓGICO ESTRICTO ---
     const filteredSheetServices = useMemo(() => {
-        if (mode === 'operations') return sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
-        return sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones');
+        let list;
+        if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
+        else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones');
+        
+        return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
     }, [sortedServices, mode]);
+
     return (
       <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 overflow-hidden backdrop-blur-sm">
           <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : s.oci}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><Map className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
@@ -553,46 +570,106 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
 
 const TransformerHistory = ({ services }) => {
     const [searchSerial, setSearchSerial] = useState("");
-    const history = useMemo(() => { if (!searchSerial) return []; return services.filter(s => s.trafoSerie && s.trafoSerie.includes(searchSerial)); }, [searchSerial, services]);
-    const lastServiceWithLoc = history.find(s => s.ubicacion);
-    const mapUrl = lastServiceWithLoc ? `https://googleusercontent.com/maps.google.com/0${encodeURIComponent(lastServiceWithLoc.ubicacion)}&t=&z=13&ie=UTF8&iwloc=&output=embed` : null;
+    const history = useMemo(() => { if (!searchSerial) return []; return services.filter(s => (s.trafoSerie && s.trafoSerie.toLowerCase().includes(searchSerial.toLowerCase())) || (s.trafoFabricacion && s.trafoFabricacion.toLowerCase().includes(searchSerial.toLowerCase()))); }, [searchSerial, services]);
+    
+    // Si no hay búsqueda, mostrar los últimos 5 para que no esté vacío
+    const displayHistory = searchSerial ? history : services.sort((a,b) => new Date(b.fInicio) - new Date(a.fInicio)).slice(0, 5);
+
     return (
         <div className="space-y-6">
             <div className="bg-white/95 p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-sm">
-                <h3 className="text-lg font-bold flex items-center text-slate-800"><History className="w-5 h-5 mr-3 text-orange-600"/> Hoja de Vida de Transformador</h3>
-                <div className="flex w-full md:w-auto flex-1 max-w-md relative"><Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400"/><input type="text" placeholder="Buscar por Nro de Serie..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-orange-100 outline-none" value={searchSerial} onChange={(e) => setSearchSerial(e.target.value)} /></div>
+                <h3 className="text-lg font-bold flex items-center text-slate-800"><History className="w-5 h-5 mr-3 text-orange-600"/> Historial de Equipos</h3>
+                <div className="flex w-full md:w-auto flex-1 max-w-md relative"><Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400"/><input type="text" placeholder="Buscar por Serie o Fabricación..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-orange-100 outline-none" value={searchSerial} onChange={(e) => setSearchSerial(e.target.value)} /></div>
             </div>
-            {history.length > 0 && (<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4"><div className="col-span-1 space-y-4"><div className="bg-white/90 p-6 rounded-2xl border border-slate-100 shadow-sm"><h4 className="font-bold text-slate-700 mb-4 border-b border-slate-100 pb-3 flex items-center"><Activity className="w-4 h-4 mr-2 text-orange-500"/> Datos Técnicos</h4><div className="space-y-4 text-sm"><div className="bg-slate-50 p-3 rounded-lg"><span className="block text-xs text-slate-400 font-bold uppercase mb-1">Nro Serie</span><span className="font-mono font-bold text-xl text-slate-800">{history[0].trafoSerie}</span></div><div className="grid grid-cols-2 gap-3"><div className="bg-slate-50 p-3 rounded-lg"><span className="block text-xs text-slate-400 font-bold uppercase mb-1">Potencia</span><span className="font-bold text-slate-700">{history[0].trafoPotencia || 'N/D'}</span></div><div className="bg-slate-50 p-3 rounded-lg"><span className="block text-xs text-slate-400 font-bold uppercase mb-1">Tensión</span><span className="font-bold text-slate-700">{history[0].trafoVoltaje || 'N/D'}</span></div></div></div></div></div><div className="col-span-2 space-y-4">{history.sort((a,b) => new Date(b.fInicio) - new Date(a.fInicio)).map(srv => (<div key={srv.id} className="bg-white/90 p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-orange-200 hover:shadow-md transition-all"><div className="flex justify-between items-start mb-3"><h5 className="font-bold text-lg text-slate-800">{srv.tipoTrabajo}</h5><span className={`px-3 py-1 rounded-full text-xs font-bold border ${srv.estado === 'Finalizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span></div><TechReportViewer service={srv} /></div>))}</div></div>)}
+            {displayHistory.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-4">
+                    {displayHistory.map(srv => (
+                        <div key={srv.id} className="bg-white/90 p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-orange-200 hover:shadow-md transition-all">
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <h5 className="font-bold text-lg text-slate-800">{srv.cliente}</h5>
+                                    <p className="text-sm text-slate-500">{srv.tipoTrabajo}</p>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${srv.estado === 'Finalizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span>
+                            </div>
+                            
+                            {/* DATOS DEL TRAFO EN LA TARJETA */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Serie</span><span className="text-sm font-mono font-bold text-slate-700">{srv.trafoSerie || '-'}</span></div>
+                                <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Fabricación</span><span className="text-sm font-mono font-bold text-slate-700">{srv.trafoFabricacion || '-'}</span></div>
+                                <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Potencia</span><span className="text-sm font-bold text-slate-700">{srv.trafoPotencia || '-'}</span></div>
+                                <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Relación</span><span className="text-sm font-bold text-slate-700">{srv.trafoRelacion || '-'}</span></div>
+                            </div>
+
+                            <div className="flex items-center text-xs text-slate-500 mb-3 space-x-4">
+                                <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {srv.fInicio}</span>
+                                <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
+                            </div>
+                            <TechReportViewer service={srv} />
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed">
+                    No se encontraron servicios con ese número de serie o fabricación.
+                </div>
+            )}
         </div>
     );
 };
 
-const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => (
-    <div className="space-y-6">
-        <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
-            <h2 className="text-3xl font-extrabold mb-2 relative z-10">Hola, {user.name} 👋</h2>
-            <p className="text-orange-100 relative z-10">Aquí tienes tus servicios asignados para hoy.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-5">
-            {services.filter(s => s.tecnicos.includes(user.name)).map(srv => (
-                <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
-                        <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {srv.fInicio} ➔ {srv.fFin}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
-                    </div>
-                    <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
-                        {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
-                        {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
-                        {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
-                        {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
-                    </div>
+const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
+    const [view, setView] = useState('list'); 
+
+    const myServices = useMemo(() => {
+        return services
+            .filter(s => s.tecnicos.includes(user.name))
+            .sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    }, [services, user.name]);
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
+                <div className="relative z-10 mb-4 md:mb-0">
+                    <h2 className="text-3xl font-extrabold mb-1">Hola, {user.name} 👋</h2>
+                    <p className="text-orange-100">Aquí tienes tus servicios asignados.</p>
                 </div>
-            ))}
+                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex">
+                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}>
+                        <List className="w-4 h-4 inline-block mr-2"/> Lista
+                    </button>
+                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}>
+                        <Calendar className="w-4 h-4 inline-block mr-2"/> Calendario
+                    </button>
+                </div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+            </div>
+
+            {view === 'list' ? (
+                <div className="grid grid-cols-1 gap-5">
+                    {/* --- ORDEN CRONOLÓGICO ESTRICTO --- */}
+                    {myServices.map(srv => (
+                        <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
+                                <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {srv.fInicio} ➔ {srv.fFin}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
+                            </div>
+                            <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                                {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
+                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
+                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
+                                {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <GanttChart services={myServices} mode="mixed" isAdmin={false} handleEdit={()=>{}} />
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 const LoginScreen = ({ onLogin, tecnicosData }) => {
     const [role, setRole] = useState('admin');
@@ -702,7 +779,7 @@ export default function App() {
         tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
         postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
         progressLogs: [], dailyLogs: [], closureData: null,
-        trafoSerie: '', trafoPotencia: '', trafoVoltaje: '', ubicacion: ''
+        trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
     });
 
     const [uploadingEvidenceService, setUploadingEvidenceService] = useState(null);
@@ -737,7 +814,7 @@ export default function App() {
                 tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
                 postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
                 progressLogs: [], dailyLogs: [], closureData: null,
-                trafoSerie: '', trafoPotencia: '', trafoVoltaje: '', ubicacion: ''
+                trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
             });
         } else {
             setEditingId(service.id);
@@ -767,7 +844,7 @@ export default function App() {
             tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
             postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
             progressLogs: [], dailyLogs: [], closureData: null,
-            trafoSerie: '', trafoPotencia: '', trafoVoltaje: '', ubicacion: ''
+            trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
         });
     };
 
@@ -833,9 +910,23 @@ export default function App() {
                                 </div>
                             </div>
 
+                            {/* --- SECCIÓN DATOS TRANSFORMADOR --- */}
+                            {formData.tipoTrabajo !== 'Vacaciones' && (
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-orange-200 transition-colors animate-in fade-in">
+                                    <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR</label>
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
+                                        <input type="text" placeholder="Nº Fabricación" className="input-field text-xs bg-white" value={formData.trafoFabricacion} onChange={e=>setFormData({...formData, trafoFabricacion:e.target.value})} />
+                                        <input type="text" placeholder="Nº Serie" className="input-field text-xs bg-white" value={formData.trafoSerie} onChange={e=>setFormData({...formData, trafoSerie:e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input type="text" placeholder="Potencia (KVA)" className="input-field text-xs bg-white" value={formData.trafoPotencia} onChange={e=>setFormData({...formData, trafoPotencia:e.target.value})} />
+                                        <input type="text" placeholder="Relación/Tens" className="input-field text-xs bg-white" value={formData.trafoRelacion} onChange={e=>setFormData({...formData, trafoRelacion:e.target.value})} />
+                                    </div>
+                                </div>
+                            )}
+
                             {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
                             
-                            {/* 🔥 RESTORED OBSERVATIONS FIELD */}
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 
                             <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
@@ -856,7 +947,7 @@ export default function App() {
                                 {id:'sheet', label:'Planilla', icon:List},
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
                                 {id:'history', label:'Historial', icon:History},
-                                {id:'kpis', label:'KPIs', icon:BarChart2} // 🔥 RESTORED KPIs TAB
+                                {id:'kpis', label:'KPIs', icon:BarChart2} 
                             ].map(tab=>(<button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     )}
@@ -873,7 +964,6 @@ export default function App() {
                             {activeTab === 'sheet' && <ServiceSheet sortedServices={services} mode="operations" handleEdit={handleEdit} handleDelete={handleDelete}/>}
                             {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
-                            {/* 🔥 RESTORED KPIs VIEW */}
                             {activeTab === 'kpis' && <KPIs services={services} />}
                         </div>
                     ) : (

@@ -976,21 +976,33 @@ export default function App() {
             </div>
 
             {/* MODALES */}
-            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Equipo de Trabajo">
-                <div className="space-y-4">
-                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <input className="input-field bg-white" placeholder="Nombre" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())}/>
-                        <input className="input-field bg-white" placeholder="Teléfono" value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)}/>
-                        <div className="flex gap-2">
-                            <input className="input-field bg-white" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)}/>
-                            <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold"><Plus className="w-5 h-5"/></button>
-                        </div>
+            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Equipo de Trabajo" size="lg">
+                <div className="space-y-6">
+                    <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 flex gap-4 items-end">
+                        <div className="flex-1"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Nuevo Técnico</label><input type="text" className="input-field bg-white" placeholder="Nombre completo" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
+                        <div className="flex-1"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input type="text" className="input-field bg-white" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
+                        <div className="w-32"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input type="text" className="input-field bg-white" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
+                        <button onClick={addTechnician} className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-700 h-[46px] shadow-md shadow-orange-200 transition-transform active:scale-95">Agregar</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                        {tecnicosData.map(t=>(
-                            <div key={t.id} className="p-3 border rounded-lg flex justify-between items-center bg-white">
-                                <div><p className="font-bold text-sm">{t.name}</p><p className="text-xs text-slate-400">{t.phone} | ****</p></div>
-                                <button onClick={()=>removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500"><Trash2 className="w-4 h-4"/></button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                        {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
+                            <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="font-bold text-sm text-slate-700">{t.name}</span>
+                                    <button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Phone className="w-3 h-3 text-slate-400" />
+                                        <input type="text" value={t.phone} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border-none rounded focus:ring-1 focus:ring-orange-200 p-1" placeholder="Teléfono" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Key className="w-3 h-3 text-slate-400" />
+                                        <input type="text" value={t.password} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border-none rounded focus:ring-1 focus:ring-orange-200 p-1 font-mono text-slate-600" placeholder="Contraseña" />
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>

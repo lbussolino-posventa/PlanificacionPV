@@ -7,7 +7,7 @@ import {
   Briefcase, ChevronRight, Globe, Map, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench, BarChart, Factory
+  Columns, Wrench, BarChart, Factory, Mail
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
 
@@ -43,13 +43,13 @@ const TIPOS_TRABAJO = [
   "Montaje de Transformador", "Supervisión de Montaje", "Asistencia por reclamo", 
   "Servicio de Mantenimiento", "Toma de Muestras (Únicamente)", 
   "Ensayos Eléctricos (Únicamente)", "Supervisión de Puesta en Marcha", 
-  "Desmontaje de Transformador", "Análisis de Aceite", "Vacaciones"
+  "Desmontaje de Transformador", "Análisis de Aceite", "Vacaciones", "Otro"
 ];
 
 const COLORS_TRABAJO = {
   "Montaje de Transformador": "#ea580c", "Supervisión de Montaje": "#f97316", "Asistencia por reclamo": "#ef4444", 
   "Servicio de Mantenimiento": "#10b981", "Toma de Muestras (Únicamente)": "#f59e0b", "Ensayos Eléctricos (Únicamente)": "#8b5cf6", 
-  "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8"
+  "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Otro": "#94a3b8"
 };
 
 const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
@@ -90,7 +90,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-// --- COMPONENTES UI (Modal, FileUploader, etc.) ---
+// --- COMPONENTES UI ---
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
   const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
@@ -187,7 +187,7 @@ const TechReportViewer = ({ service }) => {
             {!closure ? <p className="text-xs text-slate-400 italic text-center">Servicio no finalizado aún.</p> : (
               <div className="space-y-3">
                  <div className={`p-2 rounded text-xs font-bold text-center border ${closure.status === 'Finalizado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>ESTADO FINAL: {closure.status.toUpperCase()}</div>
-                 {closure.reason && <p className="text-xs text-rose-600 font-medium">Motivo: {closure.reason}</p>}
+                 {closure.reason && <p className="text-xs text-rose-600 font-medium">Motivo: {closure.reasonType} - {closure.reason}</p>}
                  <div><span className="text-xs font-bold text-slate-500 block mb-1">Observación Final:</span><p className="text-xs text-slate-700 bg-white p-2 rounded border border-slate-100">{closure.observation}</p></div>
                  <div><span className="text-xs font-bold text-slate-500 block mb-1">Acta y Archivos Finales:</span><div className="flex gap-2 flex-wrap">{closure.files.map((f, i) => (<a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-slate-100 text-slate-600 text-[10px] rounded border border-slate-200 hover:bg-slate-200"><FileCheck className="w-3 h-3 mr-1"/> {f.name}</a>))}</div></div>
               </div>
@@ -214,7 +214,6 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
         if (serviceId) onStatusChange(serviceId, targetStatus);
     };
     const getServicesByStatus = (status) => {
-        // --- ORDEN CRONOLÓGICO ESTRICTO ---
         return services.filter(s => {
             if (status === 'No Finalizado') return s.estado === 'No Finalizado' || s.postergado;
             if (status === 'Agendado') return s.estado === 'Agendado' && !s.postergado;
@@ -233,7 +232,7 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
                             <div key={service.id} draggable onDragStart={(e) => handleDragStart(e, service.id)} onClick={() => handleEdit(service)} className="kanban-card bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
                                 <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">{service.oci}</span>{service.alcance === 'Internacional' && <Globe className="w-3 h-3 text-orange-500"/>}</div>
                                 <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{service.cliente}</h4>
-                                <p className="text-[11px] text-slate-500 truncate mb-2">{service.tipoTrabajo}</p>
+                                <p className="text-[11px] text-slate-500 truncate mb-2">{service.tipoTrabajo === 'Otro' && service.tipoTrabajoOtro ? `Otro: ${service.tipoTrabajoOtro}` : service.tipoTrabajo}</p>
                                 <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg"><Calendar className="w-3 h-3"/><span>{service.fInicio}</span><span className="text-slate-300">|</span><Users className="w-3 h-3"/><span>{service.tecnicos.length}</span></div>
                             </div>
                         ))}
@@ -244,20 +243,17 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
     );
 };
 
-// --- GANTT MODIFICADO: MOSTRAR DESDE EL DÍA ACTUAL ---
 const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const [selectedGanttService, setSelectedGanttService] = useState(null);
     const visibleServices = useMemo(() => {
         let base = services; 
         if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones'); } 
         else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones'); }
-        // mode = 'mixed' para técnicos (sin filtro, muestra todo)
         return base;
     }, [services, mode]);
 
     if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros para mostrar.</div>;
     
-    // --- LÓGICA DE TIEMPO: HOY -1 DÍA HASTA +30 DÍAS (O MÁS SI HAY EVENTOS FUTUROS) ---
     const today = new Date();
     today.setHours(0,0,0,0);
     const minDate = new Date(today);
@@ -271,21 +267,19 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); 
     const chartWidth = totalDays * DAY_WIDTH;
 
-    // --- ORDEN CRONOLÓGICO ESTRICTO ---
     const sortedVisibleServices = [...visibleServices].sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
 
     return (
         <div className="bg-white/90 rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden backdrop-blur-sm relative flex flex-col h-[calc(100vh-200px)]">
            {selectedGanttService && (
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-[100] w-80 animate-in zoom-in-95 duration-200">
-                  <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50"><div><h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo}</h4><span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span></div><button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button></div>
+                  <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50"><div><h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}</h4><span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span></div><button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button></div>
                   <div className="text-xs text-slate-600 space-y-2.5">
                       <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {selectedGanttService.fSolicitud || 'N/D'}</span></div>
                       <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Cliente:</span> {selectedGanttService.cliente}</span></div>
                       <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Equipo:</span> {selectedGanttService.tecnicos.join(', ')}</span></div>
                       <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Ejecución:</span> {selectedGanttService.fInicio} al {selectedGanttService.fFin}</span></div>
                       
-                      {/* INFORMACIÓN ADICIONAL DEL TRAFO EN EL POPUP GANTT */}
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
                           <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
                           <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
@@ -318,7 +312,7 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
                <div className="pt-2">
                    {sortedVisibleServices.map((srv, idx) => {
                      const start = new Date(srv.fInicio);
-                     if (new Date(srv.fFin) < minDate) return null; // Ocultar pasados
+                     if (new Date(srv.fFin) < minDate) return null; 
 
                      let offsetDays = (start - minDate) / (1000 * 60 * 60 * 24);
                      const duration = (new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24) + 1;
@@ -328,7 +322,7 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
                      return (
                        <div key={srv.id} className="flex items-center group hover:bg-slate-50 transition-colors h-14 border-b border-slate-50/50">
                          <div className="sticky left-0 z-10 w-48 pl-4 pr-4 bg-white/95 backdrop-blur-sm border-r border-slate-100 h-full flex items-center justify-end shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]"><span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{mode === 'vacations' ? srv.tecnicos[0] : srv.cliente}</span></div>
-                         <div className="relative h-full flex-1"><div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}><span className="truncate drop-shadow-md">{mode === 'vacations' ? '🏖️ Vacaciones' : `${srv.oci} - ${srv.tipoTrabajo}`}</span></div></div>
+                         <div className="relative h-full flex-1"><div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}><span className="truncate drop-shadow-md">{mode === 'vacations' ? '🏖️ Vacaciones' : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}</span></div></div>
                          {isAdmin && <div className="sticky right-0 z-10 w-10 bg-white/50 h-full flex items-center justify-center"><button onClick={() => handleEdit(srv)} className="p-1.5 hover:bg-orange-50 rounded-full text-slate-300 hover:text-orange-600 transition-colors"><Edit2 className="w-3.5 h-3.5"/></button></div>}
                        </div>
                      );
@@ -342,7 +336,6 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     );
 };
 
-// --- COMPONENTE KPIs COMPLETADO ---
 const KPIs = ({ services }) => {
     const [kpiYear, setKpiYear] = useState('all');
     const [kpiMonth, setKpiMonth] = useState('all');
@@ -398,11 +391,7 @@ const KPIs = ({ services }) => {
         }
     });
     const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) }];
-    const statusMap = { 'Finalizado': 0, 'No Finalizado': 0, 'En Servicio': 0, 'Agendado': 0 };
-    servicesForCalc.forEach(s => { const st = s.postergado ? 'Agendado' : s.estado; statusMap[st] = (statusMap[st] || 0) + 1; });
-    const dataStatus = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
-    const COLORS_STATUS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
-
+    
     const leadTimeByMonth = {};
     const servicesByMonth = {}; 
 
@@ -552,18 +541,16 @@ const KPIs = ({ services }) => {
 };
 
 const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleDelete }) => {
-    // --- ORDEN CRONOLÓGICO ESTRICTO ---
     const filteredSheetServices = useMemo(() => {
         let list;
         if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
         else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones');
-        
         return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
     }, [sortedServices, mode]);
 
     return (
       <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 overflow-hidden backdrop-blur-sm">
-          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : s.oci}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><Map className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><Map className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
       </div>
     );
 };
@@ -571,8 +558,6 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
 const TransformerHistory = ({ services }) => {
     const [searchSerial, setSearchSerial] = useState("");
     const history = useMemo(() => { if (!searchSerial) return []; return services.filter(s => (s.trafoSerie && s.trafoSerie.toLowerCase().includes(searchSerial.toLowerCase())) || (s.trafoFabricacion && s.trafoFabricacion.toLowerCase().includes(searchSerial.toLowerCase()))); }, [searchSerial, services]);
-    
-    // Si no hay búsqueda, mostrar los últimos 5 para que no esté vacío
     const displayHistory = searchSerial ? history : services.sort((a,b) => new Date(b.fInicio) - new Date(a.fInicio)).slice(0, 5);
 
     return (
@@ -586,21 +571,15 @@ const TransformerHistory = ({ services }) => {
                     {displayHistory.map(srv => (
                         <div key={srv.id} className="bg-white/90 p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-orange-200 hover:shadow-md transition-all">
                             <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <h5 className="font-bold text-lg text-slate-800">{srv.cliente}</h5>
-                                    <p className="text-sm text-slate-500">{srv.tipoTrabajo}</p>
-                                </div>
+                                <div><h5 className="font-bold text-lg text-slate-800">{srv.cliente}</h5><p className="text-sm text-slate-500">{srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? `Otro: ${srv.tipoTrabajoOtro}` : srv.tipoTrabajo}</p></div>
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${srv.estado === 'Finalizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span>
                             </div>
-                            
-                            {/* DATOS DEL TRAFO EN LA TARJETA */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Serie</span><span className="text-sm font-mono font-bold text-slate-700">{srv.trafoSerie || '-'}</span></div>
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Fabricación</span><span className="text-sm font-mono font-bold text-slate-700">{srv.trafoFabricacion || '-'}</span></div>
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Potencia</span><span className="text-sm font-bold text-slate-700">{srv.trafoPotencia || '-'}</span></div>
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Relación</span><span className="text-sm font-bold text-slate-700">{srv.trafoRelacion || '-'}</span></div>
                             </div>
-
                             <div className="flex items-center text-xs text-slate-500 mb-3 space-x-4">
                                 <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {srv.fInicio}</span>
                                 <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
@@ -610,9 +589,7 @@ const TransformerHistory = ({ services }) => {
                     ))}
                 </div>
             ) : (
-                <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed">
-                    No se encontraron servicios con ese número de serie o fabricación.
-                </div>
+                <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed">No se encontraron servicios con ese número de serie o fabricación.</div>
             )}
         </div>
     );
@@ -620,7 +597,6 @@ const TransformerHistory = ({ services }) => {
 
 const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
     const [view, setView] = useState('list'); 
-
     const myServices = useMemo(() => {
         return services
             .filter(s => s.tecnicos.includes(user.name))
@@ -635,19 +611,14 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
                     <p className="text-orange-100">Aquí tienes tus servicios asignados.</p>
                 </div>
                 <div className="relative z-10 bg-white/20 p-1 rounded-xl flex">
-                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}>
-                        <List className="w-4 h-4 inline-block mr-2"/> Lista
-                    </button>
-                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}>
-                        <Calendar className="w-4 h-4 inline-block mr-2"/> Calendario
-                    </button>
+                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
+                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
                 </div>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
             </div>
 
             {view === 'list' ? (
                 <div className="grid grid-cols-1 gap-5">
-                    {/* --- ORDEN CRONOLÓGICO ESTRICTO --- */}
                     {myServices.map(srv => (
                         <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
                             <div className="flex-1">
@@ -658,7 +629,7 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
                             <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
                                 {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
                                 {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
-                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
+                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
                                 {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
                             </div>
                         </div>
@@ -738,6 +709,8 @@ export default function App() {
     const isOnline = useOnlineStatus();
     const [services, setServices] = useState([]);
     const [tecnicosData, setTecnicosData] = useState([]);
+    const [lastSavedService, setLastSavedService] = useState(null);
+    const [showMsgModal, setShowMsgModal] = useState(false);
 
     useEffect(() => {
         if (!document.getElementById('leaflet-css')) {
@@ -775,7 +748,7 @@ export default function App() {
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
-        fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0],
+        fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
         tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
         postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
         progressLogs: [], dailyLogs: [], closureData: null,
@@ -788,18 +761,24 @@ export default function App() {
     const [dailyLogData, setDailyLogData] = useState({ date: new Date().toISOString().split('T')[0], start: '', end: '', type: 'Trabajo' });
     const [techsForHours, setTechsForHours] = useState([]);
     const [closingService, setClosingService] = useState(null);
-    const [closureData, setClosureData] = useState({ status: 'Finalizado', reason: '', observation: '', files: [] });
+    const [closureData, setClosureData] = useState({ status: 'Finalizado', reasonType: '', reason: '', observation: '', files: [] });
     const [reopeningService, setReopeningService] = useState(null);
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
     const [newTechName, setNewTechName] = useState("");
     const [newTechPhone, setNewTechPhone] = useState("");
+    const [newTechEmail, setNewTechEmail] = useState("");
     const [newTechPassword, setNewTechPassword] = useState("");
 
     const addTechnician = async () => {
         if (newTechName && !tecnicosData.find(t => t.name === newTechName.toUpperCase())) {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), { name: newTechName.toUpperCase(), phone: newTechPhone, password: newTechPassword || "1234" });
-            setNewTechName(""); setNewTechPhone(""); setNewTechPassword(""); showNotification("Técnico agregado");
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), { 
+                name: newTechName.toUpperCase(), 
+                phone: newTechPhone, 
+                email: newTechEmail,
+                password: newTechPassword || "1234" 
+            });
+            setNewTechName(""); setNewTechPhone(""); setNewTechEmail(""); setNewTechPassword(""); showNotification("Técnico agregado");
         }
     };
     const removeTechnician = async (id, name) => { if(window.confirm(`¿Eliminar a ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id)); };
@@ -810,7 +789,7 @@ export default function App() {
             setEditingId(null);
             setFormData({
                 oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
-                fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0],
+                fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
                 tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
                 postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
                 progressLogs: [], dailyLogs: [], closureData: null,
@@ -831,16 +810,43 @@ export default function App() {
             progressLogs: editingId ? (services.find(s=>s.id===editingId)?.progressLogs || []) : [],
             dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : []
         };
-        if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); showNotification("Servicio actualizado"); } 
-        else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); showNotification("Servicio creado"); }
+        if (editingId) { 
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); 
+            showNotification("Servicio actualizado"); 
+        } else { 
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); 
+            showNotification("Servicio creado"); 
+        }
+        setLastSavedService(serviceData);
+        if (!editingId || (editingId && !formData.postergado)) setShowMsgModal(true);
         setIsSidebarOpen(false); resetForm();
+    };
+
+    const handleWhatsApp = (techName) => {
+        if (!lastSavedService) return;
+        const tech = tecnicosData.find(t => t.name === techName);
+        if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
+        const duracion = (new Date(lastSavedService.fFin) - new Date(lastSavedService.fInicio)) / (1000 * 60 * 60 * 24) + 1;
+        const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
+        const msg = `--- TICKET DE SERVICIO TECNICO ---\n\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nINICIO: ${lastSavedService.fInicio}\nFIN: ${lastSavedService.fFin}\nDURACION: ${duracion} dias\nTAREA: ${tipoDetallado}\n\n>> Iniciar en App al llegar.`;
+        window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    const handleEmail = (techName) => {
+        if (!lastSavedService) return;
+        const tech = tecnicosData.find(t => t.name === techName);
+        if (!tech || !tech.email) { showNotification(`Sin correo configurado para ${techName}`, "error"); return; }
+        const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente} - OCI ${lastSavedService.oci}`);
+        const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
+        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${lastSavedService.fInicio} al ${lastSavedService.fFin}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
+        window.open(`mailto:${tech.email}?subject=${subject}&body=${body}`, '_blank');
     };
 
     const resetForm = () => {
         setEditingId(null);
         setFormData({
             oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
-            fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0],
+            fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
             tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
             postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
             progressLogs: [], dailyLogs: [], closureData: null,
@@ -897,7 +903,13 @@ export default function App() {
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asignación</p>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {editingId && (<div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-sm flex justify-between items-center"><span className="font-bold text-amber-800">✏️ Editando...</span><button type="button" onClick={resetForm} className="text-xs bg-white border px-2 py-1 rounded">Cancelar</button></div>)}
-                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">TIPO</label><select className="input-field" value={formData.tipoTrabajo} onChange={e=>{const v = e.target.value; setFormData(p=>({...p, tipoTrabajo: v, cliente: v==='Vacaciones'?'INTERNO':p.cliente, oci: v==='Vacaciones'?'VACACIONES':p.oci, vehiculos: v==='Vacaciones'?[]:p.vehiculos}));}}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">TIPO</label>
+                                <select className="input-field" value={formData.tipoTrabajo} onChange={e=>{const v = e.target.value; setFormData(p=>({...p, tipoTrabajo: v, cliente: v==='Vacaciones'?'INTERNO':p.cliente, oci: v==='Vacaciones'?'VACACIONES':p.oci, vehiculos: v==='Vacaciones'?[]:p.vehiculos}));}}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                {formData.tipoTrabajo === 'Otro' && (
+                                    <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique el tipo de trabajo..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
+                                )}
+                            </div>
                             {formData.tipoTrabajo !== 'Vacaciones' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
                             <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
                             {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label><input type="date" className="input-field" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} /></div>)}
@@ -927,6 +939,7 @@ export default function App() {
 
                             {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
                             
+                            {/* 🔥 RESTORED OBSERVATIONS FIELD */}
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 
                             <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
@@ -978,13 +991,28 @@ export default function App() {
             {/* MODALES */}
             <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Equipo de Trabajo" size="lg">
                 <div className="space-y-6">
-                    <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 flex gap-4 items-end">
-                        <div className="flex-1"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Nuevo Técnico</label><input type="text" className="input-field bg-white" placeholder="Nombre completo" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
-                        <div className="flex-1"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input type="text" className="input-field bg-white" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
-                        <div className="w-32"><label className="text-xs font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input type="text" className="input-field bg-white" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
-                        <button onClick={addTechnician} className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-700 h-[46px] shadow-md shadow-orange-200 transition-transform active:scale-95">Agregar</button>
+                    <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label>
+                            <input className="input-field bg-white text-xs py-2" placeholder="Nombre completo" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label>
+                            <input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo Electrónico</label>
+                            <input type="email" className="input-field bg-white text-xs py-2" placeholder="tecnico@empresa.com" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} />
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label>
+                                <input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} />
+                            </div>
+                            <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 transition-transform active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                         {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
                             <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
                                 <div className="flex justify-between items-center mb-2">
@@ -995,18 +1023,47 @@ export default function App() {
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
-                                        <Phone className="w-3 h-3 text-slate-400" />
-                                        <input type="text" value={t.phone} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border-none rounded focus:ring-1 focus:ring-orange-200 p-1" placeholder="Teléfono" />
+                                        <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none transition-colors" placeholder="Teléfono" />
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Key className="w-3 h-3 text-slate-400" />
-                                        <input type="text" value={t.password} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border-none rounded focus:ring-1 focus:ring-orange-200 p-1 font-mono text-slate-600" placeholder="Contraseña" />
+                                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none transition-colors" placeholder="Correo electrónico" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Key className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none font-mono text-slate-600 transition-colors" placeholder="Contraseña" />
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
+            </Modal>
+
+            <Modal isOpen={showMsgModal} onClose={()=>setShowMsgModal(false)} title="📢 Notificar Asignación">
+                 <div className="grid gap-3">
+                     {lastSavedService?.tecnicos.length > 0 ? (
+                         lastSavedService.tecnicos.map(t => (
+                             <div key={t} className="flex flex-col bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-300 hover:shadow-md transition-all group">
+                                 <div className="flex items-center mb-3">
+                                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mr-3 text-slate-500 font-bold">{t.charAt(0)}</div>
+                                     <span className="font-bold text-slate-700">{t}</span>
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <button onClick={()=>handleWhatsApp(t)} className="flex-1 text-emerald-600 flex items-center justify-center text-xs font-bold bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors">
+                                         <MessageCircle className="w-4 h-4 mr-1.5"/> WhatsApp
+                                     </button>
+                                     <button onClick={()=>handleEmail(t)} className="flex-1 text-blue-600 flex items-center justify-center text-xs font-bold bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-colors">
+                                         <Mail className="w-4 h-4 mr-1.5"/> Correo
+                                     </button>
+                                 </div>
+                             </div>
+                         ))
+                     ) : (
+                         <p className="text-center text-slate-500 text-sm py-4">No hay técnicos asignados para notificar.</p>
+                     )}
+                 </div>
             </Modal>
 
             <Modal isOpen={!!uploadingEvidenceService} onClose={()=>setUploadingEvidenceService(null)} title="Subir Evidencia">
@@ -1043,7 +1100,36 @@ export default function App() {
                         <button onClick={()=>setClosureData({...closureData, status:'No Finalizado'})} className={`flex-1 py-2 border rounded-lg font-bold ${closureData.status==='No Finalizado'?'bg-rose-50 border-rose-500 text-rose-700':'bg-white'}`}>No Finalizado</button>
                     </div>
                     <textarea className="input-field h-24" placeholder="Observaciones finales..." value={closureData.observation} onChange={e=>setClosureData({...closureData, observation:e.target.value})}/>
-                    {closureData.status === 'No Finalizado' && <input className="input-field" placeholder="Motivo..." value={closureData.reason} onChange={e=>setClosureData({...closureData, reason:e.target.value})}/>}
+                    
+                    {/* --- NUEVO: DROPDOWN PARA MOTIVOS SI NO ES FINALIZADO --- */}
+                    {closureData.status === 'No Finalizado' && (
+                        <div className="space-y-3 animate-in slide-in-from-top-2">
+                            <label className="block text-xs font-bold text-rose-500 uppercase tracking-wider">Especificar Motivo</label>
+                            <select 
+                                className="input-field border-rose-200 focus:border-rose-500 focus:ring-rose-100" 
+                                value={closureData.reasonType} 
+                                onChange={e => setClosureData({...closureData, reasonType: e.target.value, reason: e.target.value === 'Otros' ? '' : e.target.value})}
+                            >
+                                <option value="">Seleccione un motivo...</option>
+                                <option value="Falta de repuestos">Falta de repuestos</option>
+                                <option value="Falta de tiempo">Falta de tiempo</option>
+                                <option value="Cliente ausente/no disponible">Cliente ausente / no disponible</option>
+                                <option value="Condiciones climáticas adversas">Condiciones climáticas adversas</option>
+                                <option value="Problema técnico no resuelto">Problema técnico no resuelto</option>
+                                <option value="Otros">Otros (Especificar)</option>
+                            </select>
+                            
+                            {closureData.reasonType === 'Otros' && (
+                                <input 
+                                    className="input-field border-rose-200 focus:border-rose-500 focus:ring-rose-100 animate-in fade-in" 
+                                    placeholder="Describa el motivo..." 
+                                    value={closureData.reason} 
+                                    onChange={e=>setClosureData({...closureData, reason:e.target.value})}
+                                />
+                            )}
+                        </div>
+                    )}
+                    
                     <FileUploader files={closureData.files} setFiles={(f)=>setClosureData({...closureData, files:f})} label="ACTA"/>
                     <button onClick={handleTechClosure} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Confirmar Cierre</button>
                 </div>

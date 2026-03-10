@@ -745,6 +745,8 @@ export default function App() {
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isManageTechOpen, setIsManageTechOpen] = useState(false);
+    const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); // NUEVO ESTADO PARA MODAL CAMBIO CLAVE ADMIN
+    const [newAdminPasswordToChange, setNewAdminPasswordToChange] = useState(""); // NUEVO ESTADO PARA NUEVA CLAVE ADMIN
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
@@ -783,6 +785,22 @@ export default function App() {
     };
     const removeTechnician = async (id, name) => { if(window.confirm(`¿Eliminar a ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id)); };
     const updateTechData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id), { [field]: value }); };
+
+    // --- NUEVA FUNCIÓN PARA CAMBIAR CONTRASEÑA DE ADMIN ---
+    const handleChangeAdminPassword = async () => {
+        if (newAdminPasswordToChange.length < 6) {
+            showNotification("La contraseña debe tener al menos 6 caracteres", "error");
+            return;
+        }
+        try {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: newAdminPasswordToChange }, { merge: true });
+            showNotification("Contraseña de Administrador actualizada");
+            setIsChangeAdminPasswordOpen(false);
+            setNewAdminPasswordToChange("");
+        } catch (e) {
+            showNotification("Error al actualizar la contraseña", "error");
+        }
+    };
 
     const handleEdit = (service) => {
         if(service.id === 'new') {
@@ -839,7 +857,9 @@ export default function App() {
         const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente} - OCI ${lastSavedService.oci}`);
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
         const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${lastSavedService.fInicio} al ${lastSavedService.fFin}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
-        window.open(`mailto:${tech.email}?subject=${subject}&body=${body}`, '_blank');
+        
+        // Uso de window.location.href en lugar de window.open evita que los bloqueadores de pop-ups anulen la acción
+        window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
     };
 
     const resetForm = () => {
@@ -899,7 +919,17 @@ export default function App() {
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white"><div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black">PLANIFICACIÓN</h2><p className="text-xs font-bold text-orange-600">POSTVENTA</p></div></div><button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden"><X/></button></div>
                 {isAdmin ? (
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                        <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold mb-6"><span className="flex items-center"><Settings className="w-4 h-4 mr-2 text-slate-400"/> Personal</span><ChevronRight className="w-4 h-4 text-slate-300"/></button>
+                        
+                        {/* --- SECCIÓN DE CONFIGURACIÓN DE ADMIN MODIFICADA --- */}
+                        <div className="mb-6 space-y-2">
+                            <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
+                                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Claves</span><ChevronRight className="w-4 h-4 text-slate-300"/>
+                            </button>
+                            <button onClick={() => setIsChangeAdminPasswordOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
+                                <span className="flex items-center"><Key className="w-4 h-4 mr-2 text-slate-400"/> Clave Administrador</span><ChevronRight className="w-4 h-4 text-slate-300"/>
+                            </button>
+                        </div>
+
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asignación</p>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {editingId && (<div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-sm flex justify-between items-center"><span className="font-bold text-amber-800">✏️ Editando...</span><button type="button" onClick={resetForm} className="text-xs bg-white border px-2 py-1 rounded">Cancelar</button></div>)}
@@ -939,7 +969,6 @@ export default function App() {
 
                             {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
                             
-                            {/* 🔥 RESTORED OBSERVATIONS FIELD */}
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 
                             <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
@@ -988,8 +1017,8 @@ export default function App() {
                 </main>
             </div>
 
-            {/* MODALES */}
-            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Equipo de Trabajo" size="lg">
+            {/* MODALES DE CONFIGURACIÓN DE PERSONAL */}
+            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Personal y Claves" size="lg">
                 <div className="space-y-6">
                     <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
                         <div>
@@ -1012,7 +1041,10 @@ export default function App() {
                             <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 transition-transform active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 font-medium">
+                        💡 Puedes editar las contraseñas y datos directamente en los campos de abajo. ¡Se guardan automáticamente!
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                         {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
                             <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
                                 <div className="flex justify-between items-center mb-2">
@@ -1024,15 +1056,15 @@ export default function App() {
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
                                         <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                                        <input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none transition-colors" placeholder="Teléfono" />
+                                        <input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" />
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                                        <input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none transition-colors" placeholder="Correo electrónico" />
+                                        <input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo electrónico" />
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Key className="w-3 h-3 text-slate-400 shrink-0" />
-                                        <input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1 outline-none font-mono text-slate-600 transition-colors" placeholder="Contraseña" />
+                                        <input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" />
                                     </div>
                                 </div>
                             </div>
@@ -1041,6 +1073,21 @@ export default function App() {
                 </div>
             </Modal>
 
+            <Modal isOpen={isChangeAdminPasswordOpen} onClose={()=>setIsChangeAdminPasswordOpen(false)} title="Cambiar Clave de Administrador" size="sm">
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500">Ingresa la nueva contraseña maestra para acceder al panel de administración.</p>
+                    <input 
+                        type="text" 
+                        className="input-field font-mono" 
+                        placeholder="Nueva contraseña (mínimo 6 caracteres)" 
+                        value={newAdminPasswordToChange} 
+                        onChange={e => setNewAdminPasswordToChange(e.target.value)}
+                    />
+                    <button onClick={handleChangeAdminPassword} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">Actualizar Contraseña</button>
+                </div>
+            </Modal>
+
+            {/* MODALES TÉCNICOS Y OPERATIVOS */}
             <Modal isOpen={showMsgModal} onClose={()=>setShowMsgModal(false)} title="📢 Notificar Asignación">
                  <div className="grid gap-3">
                      {lastSavedService?.tecnicos.length > 0 ? (
@@ -1101,7 +1148,6 @@ export default function App() {
                     </div>
                     <textarea className="input-field h-24" placeholder="Observaciones finales..." value={closureData.observation} onChange={e=>setClosureData({...closureData, observation:e.target.value})}/>
                     
-                    {/* --- NUEVO: DROPDOWN PARA MOTIVOS SI NO ES FINALIZADO --- */}
                     {closureData.status === 'No Finalizado' && (
                         <div className="space-y-3 animate-in slide-in-from-top-2">
                             <label className="block text-xs font-bold text-rose-500 uppercase tracking-wider">Especificar Motivo</label>

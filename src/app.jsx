@@ -541,15 +541,38 @@ const KPIs = ({ services }) => {
 };
 
 const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleDelete }) => {
+    const [hideCompleted, setHideCompleted] = useState(false);
+
+    // --- ORDEN CRONOLÓGICO ESTRICTO Y FILTRO ---
     const filteredSheetServices = useMemo(() => {
         let list;
         if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
         else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones');
+        
+        // Filtrar servicios finalizados si el switch está activado
+        if (hideCompleted) {
+            list = list.filter(s => s.estado !== 'Finalizado');
+        }
+        
         return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
-    }, [sortedServices, mode]);
+    }, [sortedServices, mode, hideCompleted]);
 
     return (
       <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 overflow-hidden backdrop-blur-sm">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-bold text-slate-700 text-sm">
+                  {mode === 'operations' ? 'Listado de Operaciones' : 'Listado de Vacaciones'}
+              </h3>
+              <label className="flex items-center space-x-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
+                  <input
+                      type="checkbox"
+                      checked={hideCompleted}
+                      onChange={(e) => setHideCompleted(e.target.checked)}
+                      className="accent-orange-600 w-4 h-4 rounded border-slate-300"
+                  />
+                  <span className="text-xs font-bold text-slate-600">Ocultar Finalizados</span>
+              </label>
+          </div>
           <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><Map className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
       </div>
     );

@@ -4,7 +4,7 @@ import {
   Trash2, Plus, X, Search, Edit2, LogOut, Menu, Copy, MessageCircle, Settings, 
   Phone, Lock, UserPlus, ExternalLink, Paperclip, FileText, Image as ImageIcon, 
   History, Eye, Save, XCircle, CheckSquare, List, MapPin, PlayCircle, Clock, Activity,
-  Briefcase, ChevronRight, Globe, Map, Filter, TrendingUp, UserCheck, CalendarPlus,
+  Briefcase, ChevronRight, Globe, Map as MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
   Columns, Wrench, BarChart, Factory, Mail
@@ -56,6 +56,132 @@ const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
 const TERCERIZADOS = ["AEREO", "VEHICULO KINTO"];
 const TODOS_VEHICULOS = [...FLOTA_PROPIA, ...TERCERIZADOS];
 
+// --- PRE-CARGA DEL MAPA MUNDIAL ---
+const PRELOADED_LOCATIONS = [
+  { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
+  { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
+  { lat: -31.4647, lng: -64.3575, popupContent: '<b>Malagueño, Córdoba</b>' },
+  { lat: -28.0652, lng: -67.5644, popupContent: '<b>Tinogasta, Catamarca</b>' },
+  { lat: -45.8641, lng: -67.4965, popupContent: '<b>Comodoro Rivadavia, Chubut</b>' },
+  { lat: -38.9516, lng: -68.0591, popupContent: '<b>Neuquén, Neuquén</b>' },
+  { lat: -34.0833, lng: -59.0333, popupContent: '<b>Zárate, Buenos Aires</b>' },
+  { lat: -23.4005, lng: -66.3672, popupContent: '<b>Susques, Jujuy</b>' },
+  { lat: -30.2333, lng: -68.7500, popupContent: '<b>Jáchal, San Juan</b>' },
+  { lat: -34.8584, lng: -57.9084, popupContent: '<b>Ensenada, Buenos Aires</b>' },
+  { lat: -31.4201, lng: -64.1888, popupContent: '<b>Córdoba, Córdoba</b>' },
+  { lat: -31.6804, lng: -63.8821, popupContent: '<b>Pilar, Córdoba</b>' },
+  { lat: -32.7231, lng: -71.4158, popupContent: '<b>Puchuncaví, Chile</b>' },
+  { lat: -33.1235, lng: -64.3499, popupContent: '<b>Río Cuarto, Córdoba</b>' },
+  { lat: -27.2721, lng: -62.2345, popupContent: '<b>Otumpa, Santiago del Estero</b>' },
+  { lat: -38.7196, lng: -62.2724, popupContent: '<b>Bahía Blanca, Buenos Aires</b>' },
+  { lat: -41.1335, lng: -71.3103, popupContent: '<b>Bariloche, Río Negro</b>' },
+  { lat: -28.0267, lng: -56.0272, popupContent: '<b>Virasoro, Corrientes</b>' },
+  { lat: -46.5895, lng: -70.9309, popupContent: '<b>Perito Moreno, Santa Cruz</b>' },
+  { lat: -34.6118, lng: -58.7656, popupContent: '<b>Trujui, Buenos Aires</b>' },
+  { lat: -31.6389, lng: -68.9600, popupContent: '<b>Punta Negra, San Juan</b>' },
+  { lat: -32.1800, lng: -64.4167, popupContent: '<b>Embalse, Córdoba</b>' },
+  { lat: -30.9333, lng: -69.6000, popupContent: '<b>Tocota, San Juan</b>' },
+  { lat: -34.7069, lng: -58.3100, popupContent: '<b>Bernal, Buenos Aires</b>' },
+  { lat: -42.7692, lng: -65.0245, popupContent: '<b>Puerto Madryn, Chubut</b>' },
+  { lat: -38.8386, lng: -61.8594, popupContent: '<b>Bajo Hondo, Buenos Aires</b>' },
+  { lat: -32.1764, lng: -64.1132, popupContent: '<b>Río Tercero, Córdoba</b>' },
+  { lat: -37.3217, lng: -59.1332, popupContent: '<b>Tandil, Buenos Aires</b>' },
+  { lat: -39.8142, lng: -73.2459, popupContent: '<b>Valdivia, Chile</b>' },
+  { lat: -32.6284, lng: -62.6868, popupContent: '<b>Bell Ville, Córdoba</b>' },
+  { lat: -46.5458, lng: -71.6277, popupContent: '<b>Los Antiguos, Santa Cruz</b>' },
+  { lat: -39.7554, lng: -65.7362, popupContent: '<b>El Solito, Río Negro</b>' },
+  { lat: -37.9833, lng: -60.1000, popupContent: '<b>Adolfo Gonzales Chaves, Buenos Aires</b>' },
+  { lat: -24.7859, lng: -65.0453, popupContent: '<b>Güemes, Salta</b>' },
+  { lat: -28.4696, lng: -65.7852, popupContent: '<b>Catamarca, Catamarca</b>' },
+  { lat: -34.8167, lng: -58.5167, popupContent: '<b>Ezeiza, Buenos Aires</b>' },
+  { lat: -37.9500, lng: -68.8500, popupContent: '<b>Rincón de los Sauces, Neuquén</b>' },
+  { lat: -34.1167, lng: -63.3667, popupContent: '<b>Laboulaye, Córdoba</b>' },
+  { lat: -39.4333, lng: -66.2167, popupContent: '<b>Pomona, Río Negro</b>' },
+  { lat: -33.2867, lng: -60.5847, popupContent: '<b>Arroyo Seco, Santa Fe</b>' },
+  { lat: -31.7319, lng: -60.5238, popupContent: '<b>Paraná, Entre Ríos</b>' },
+  { lat: -34.1633, lng: -58.9592, popupContent: '<b>Campana, Buenos Aires</b>' },
+  { lat: -29.9833, lng: -64.3500, popupContent: '<b>Villa de María, Córdoba</b>' },
+  { lat: -34.1833, lng: -70.3333, popupContent: '<b>El Teniente (Maitenes), Chile</b>' },
+  { lat: -25.2637, lng: -57.5759, popupContent: '<b>Asunción, Paraguay</b>' },
+  { lat: -38.9960, lng: -64.2591, popupContent: '<b>Río Colorado, Río Negro</b>' },
+  { lat: -36.8889, lng: -60.3225, popupContent: '<b>Olavarría, Buenos Aires</b>' },
+  { lat: -25.4667, lng: -57.5500, popupContent: '<b>Ypané, Paraguay</b>' },
+  { lat: -39.1167, lng: -65.2667, popupContent: '<b>Pichi Mahuida, Río Negro</b>' },
+  { lat: -34.6037, lng: -58.3816, popupContent: '<b>Buenos Aires, CABA</b>' },
+  { lat: -26.9000, lng: -61.1667, popupContent: '<b>Pampa del Infierno, Chaco</b>' },
+  { lat: -36.0151, lng: -59.0967, popupContent: '<b>Las Flores, Buenos Aires</b>' },
+  { lat: -32.3333, lng: -64.9667, popupContent: '<b>Los Molles, San Luis</b>' },
+  { lat: -36.6500, lng: -61.2667, popupContent: '<b>La Elbita, Buenos Aires</b>' },
+  { lat: -35.9833, lng: -62.7333, popupContent: '<b>Trenque Lauquen, Buenos Aires</b>' },
+  { lat: -38.5744, lng: -58.7885, popupContent: '<b>Necochea, Buenos Aires</b>' },
+  { lat: -37.1667, lng: -57.9167, popupContent: '<b>Las Armas, Buenos Aires</b>' },
+  { lat: -35.6167, lng: -69.5833, popupContent: '<b>Malargüe, Mendoza</b>' },
+  { lat: -28.3167, lng: -63.1333, popupContent: '<b>Lugones, Santiago del Estero</b>' },
+  { lat: -27.9500, lng: -63.8833, popupContent: '<b>Forres, Santiago del Estero</b>' },
+  { lat: -27.5833, lng: -60.4167, popupContent: '<b>Villa Ángela, Chaco</b>' },
+  { lat: -28.4500, lng: -63.4667, popupContent: '<b>Garza, Santiago del Estero</b>' },
+  { lat: -27.4606, lng: -58.8341, popupContent: '<b>Corrientes, Corrientes</b>' },
+  { lat: -33.3021, lng: -66.3368, popupContent: '<b>San Luis, San Luis</b>' },
+  { lat: -31.5500, lng: -65.0167, popupContent: '<b>Villa Cura Brochero, Córdoba</b>' },
+  { lat: -34.1208, lng: -70.4358, popupContent: '<b>Sewell, Chile</b>' },
+  { lat: -23.4000, lng: -57.1667, popupContent: '<b>Horqueta, Paraguay</b>' },
+  { lat: -27.8167, lng: -64.0667, popupContent: '<b>Robles, Santiago del Estero</b>' },
+  { lat: 35.2529,  lng: -95.3486, popupContent: '<b>Eufaula Dam, Oklahoma, USA</b>' },
+  { lat: 39.7817,  lng: -89.6501, popupContent: '<b>Springfield, Illinois, USA</b>' },
+  { lat: 47.4235,  lng: -120.3103, popupContent: '<b>Wenatchee, Washington, USA</b>' },
+  { lat: 44.9778,  lng: -93.2650, popupContent: '<b>Minneapolis, Minnesota, USA</b>' },
+  { lat: 41.3459,  lng: -73.0784, popupContent: '<b>Ansonia, Connecticut, USA</b>' },
+  { lat: 36.2920,  lng: -95.6186, popupContent: '<b>Pryor Creek, Oklahoma, USA</b>' },
+  { lat: 33.4735,  lng: -82.0105, popupContent: '<b>Augusta, Georgia, USA</b>' },
+  { lat: 44.0582,  lng: -121.3153, popupContent: '<b>Bend, Oregon, USA</b>' },
+  { lat: 33.9982,  lng: -96.3378, popupContent: '<b>Durant, Oklahoma, USA</b>' },
+  { lat: 32.0232,  lng: -97.3917, popupContent: '<b>Blum, Texas, USA</b>' },
+  { lat: 8.2936,   lng: -62.7208, popupContent: '<b>Puerto Ordaz, Venezuela</b>' },
+  { lat: 13.6929,  lng: -89.2182, popupContent: '<b>San Salvador, El Salvador</b>' },
+  { lat: 25.0479,  lng: -77.3554, popupContent: '<b>Nassau, Bahamas</b>' },
+  { lat: 19.3133,  lng: -81.3875, popupContent: '<b>George Town, Cayman Islands</b>' },
+  { lat: 21.2323,  lng: -86.7303, popupContent: '<b>Isla Mujeres, Mexico</b>' },
+  { lat: -32.4075, lng: -63.2402, popupContent: '<b>Villa María, Córdoba</b>' },
+  { lat: 32.3792,  lng: -86.3077, popupContent: '<b>Montgomery, Alabama, USA</b>' },
+  { lat: 30.2980,  lng: -87.6833, popupContent: '<b>Foley, Alabama, USA</b>' },
+  { lat: 35.5398,  lng: -109.8037, popupContent: '<b>Oak Springs, Arizona, USA</b>' },
+  { lat: -25.4284, lng: -49.2733, popupContent: '<b>Curitiba, Brazil</b>' },
+  { lat: -17.7833, lng: -63.1833, popupContent: '<b>Santa Cruz de la Sierra, Bolivia</b>' },
+  { lat: -24.9140, lng: -65.4883, popupContent: '<b>Cerrillos, Salta</b>' },
+  { lat: -43.2489, lng: -65.3094, popupContent: '<b>Trelew, Chubut</b>' },
+  { lat: -31.8360, lng: -60.5165, popupContent: '<b>Oro Verde, Entre Ríos</b>' },
+  { lat: -34.5153, lng: -58.7658, popupContent: '<b>José C. Paz, Buenos Aires</b>' },
+  { lat: -32.9247, lng: -68.7972, popupContent: '<b>Luzuriaga, Mendoza</b>' },
+  { lat: -43.7667, lng: -66.4500, popupContent: '<b>Dique Florentino Ameghino, Chubut</b>' },
+  { lat: -29.4131, lng: -66.8557, popupContent: '<b>La Rioja (ET Tardecitas)</b>' },
+  { lat: -34.9205, lng: -57.9536, popupContent: '<b>La Plata, Buenos Aires</b>' },
+  { lat: -51.3536, lng: -70.4373, popupContent: '<b>La Esperanza, Santa Cruz</b>' },
+  { lat: -39.0333, lng: -67.5833, popupContent: '<b>General Roca, Río Negro</b>' },
+  { lat: -31.8667, lng: -62.7167, popupContent: '<b>Las Varillas, Córdoba</b>' },
+  { lat: -38.2500, lng: -61.9000, popupContent: '<b>Tres Picos, Buenos Aires</b>' },
+  { lat: -34.8039, lng: -69.6053, popupContent: '<b>El Sosneado, Mendoza</b>' },
+  { lat: -26.8329, lng: -65.1664, popupContent: '<b>Banda del Río Salí, Tucumán</b>' },
+  { lat: -26.9167, lng: -65.3333, popupContent: '<b>Lules, Tucumán</b>' },
+  { lat: -38.9333, lng: -69.2333, popupContent: '<b>Cutral Có, Neuquén</b>' },
+  { lat: -46.5895, lng: -70.9309, popupContent: '<b>Perito Moreno, Santa Cruz</b>' },
+  { lat: -53.7883, lng: -67.7032, popupContent: '<b>Río Grande, Tierra del Fuego</b>' }
+];
+
+// Extrae coordenadas de forma robusta de URLs de google maps o textos
+const extractCoordinates = (str) => {
+    if (!str) return null;
+    
+    // 1. Intenta extraer el patrón @lat,lng típico de links largos de Google Maps
+    const atMatch = str.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+    // 2. Intenta extraer pares separados por coma típicos: -34.123, -58.123
+    const commaMatch = str.match(/(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/);
+    if (commaMatch) return { lat: parseFloat(commaMatch[1]), lng: parseFloat(commaMatch[2]) };
+    
+    return null;
+};
+
 const useOnlineStatus = () => {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     useEffect(() => {
@@ -90,7 +216,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-// --- COMPONENTES UI ---
+// --- COMPONENTES UI (Modal, FileUploader, etc.) ---
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
   const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
@@ -246,8 +372,7 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
 const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const [selectedGanttService, setSelectedGanttService] = useState(null);
     const visibleServices = useMemo(() => {
-        let base = services.filter(s => s.estado !== 'Finalizado'); // Ocultar finalizados del calendario general
-        
+        let base = services.filter(s => s.estado !== 'Finalizado'); 
         if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); } 
         else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos'); }
         return base;
@@ -337,6 +462,96 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     );
 };
 
+// --- COMPONENTE MAPA DEL MUNDO DE SERVICIOS (CON GEOCODIFICACIÓN DINÁMICA) ---
+const MapDashboard = ({ services }) => {
+    const mapContainerRef = useRef(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        let map = null;
+        let initTimeout;
+
+        const initMap = async () => {
+            if (!window.L) {
+                if (isMounted) initTimeout = setTimeout(initMap, 500);
+                return;
+            }
+            if (!mapContainerRef.current) return;
+
+            // Limpieza del contenedor para evitar inicialización duplicada
+            if (mapContainerRef.current._leaflet_id) {
+                mapContainerRef.current._leaflet_id = null;
+            }
+            mapContainerRef.current.innerHTML = '';
+
+            try {
+                map = window.L.map(mapContainerRef.current).setView([-38.4161, -63.6167], 4); 
+                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+                
+                setTimeout(() => {
+                    if (map && isMounted) map.invalidateSize();
+                }, 250);
+
+                const transformerIcon = window.L.icon({
+                    iconUrl: 'https://i.imgur.com/xX4Jhem.png',
+                    iconSize:     [62, 52],
+                    iconAnchor:   [31, 52],
+                    popupAnchor:  [0, -52]
+                });
+
+                // Carga localizaciones iniciales precargadas
+                PRELOADED_LOCATIONS.forEach(loc => {
+                    if(loc.lat && loc.lng && isMounted) {
+                        window.L.marker([loc.lat, loc.lng], { icon: transformerIcon })
+                            .addTo(map)
+                            .bindPopup(loc.popupContent);
+                    }
+                });
+
+                // Carga servicios finalizados con ubicación
+                const finishedServices = services.filter(s => s.estado === 'Finalizado' && s.ubicacion);
+                
+                for (const s of finishedServices) {
+                    if (!isMounted) break;
+                    let coords = extractCoordinates(s.ubicacion);
+                    
+                    // Fallback: Si la regex no encuentra coordenadas y es un string (no un link corto), buscar la ciudad
+                    if (!coords && s.ubicacion.trim().length > 3 && !s.ubicacion.includes('goo.gl')) {
+                        try {
+                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(s.ubicacion)}&limit=1`);
+                            const data = await res.json();
+                            if (data && data.length > 0) {
+                                coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                            }
+                        } catch (e) {
+                            console.error("Geocoding error", e);
+                        }
+                    }
+
+                    if (coords && isMounted) {
+                        window.L.marker([coords.lat, coords.lng], { icon: transformerIcon })
+                            .addTo(map)
+                            .bindPopup(`<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`);
+                    }
+                }
+            } catch (e) {
+                console.error("Error initializing map: ", e);
+            }
+        };
+        initMap();
+
+        return () => {
+            isMounted = false;
+            if (initTimeout) clearTimeout(initTimeout);
+            if (map) map.remove();
+        };
+    }, [services]);
+
+    return <div ref={mapContainerRef} className="w-full h-[calc(100vh-220px)] rounded-xl z-0 border border-slate-200 relative overflow-hidden" />;
+};
+
 const KPIs = ({ services }) => {
     const [kpiYear, setKpiYear] = useState('all');
     const [kpiMonth, setKpiMonth] = useState('all');
@@ -346,7 +561,6 @@ const KPIs = ({ services }) => {
         return (kpiYear === 'all' || sDate.getFullYear().toString() === kpiYear) && (kpiMonth === 'all' || sDate.getMonth().toString() === kpiMonth); 
     });
     
-    // Excluir vacaciones y estudios médicos de los KPIs operativos
     const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
 
     if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
@@ -393,7 +607,11 @@ const KPIs = ({ services }) => {
         }
     });
     const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) }];
-    
+    const statusMap = { 'Finalizado': 0, 'No Finalizado': 0, 'En Servicio': 0, 'Agendado': 0 };
+    servicesForCalc.forEach(s => { const st = s.postergado ? 'Agendado' : s.estado; statusMap[st] = (statusMap[st] || 0) + 1; });
+    const dataStatus = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
+    const COLORS_STATUS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
+
     const leadTimeByMonth = {};
     const servicesByMonth = {}; 
 
@@ -545,13 +763,11 @@ const KPIs = ({ services }) => {
 const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleDelete }) => {
     const [hideCompleted, setHideCompleted] = useState(false);
 
-    // --- ORDEN CRONOLÓGICO ESTRICTO Y FILTRO ---
     const filteredSheetServices = useMemo(() => {
         let list;
         if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
         else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos');
         
-        // Filtrar servicios finalizados si el switch está activado
         if (hideCompleted) {
             list = list.filter(s => s.estado !== 'Finalizado');
         }
@@ -575,7 +791,7 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
                   <span className="text-xs font-bold text-slate-600">Ocultar Finalizados</span>
               </label>
           </div>
-          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><Map className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><MapIcon className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
       </div>
     );
 };
@@ -652,7 +868,6 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
 
             {view === 'list' ? (
                 <div className="grid grid-cols-1 gap-5">
-                    {/* --- ORDEN CRONOLÓGICO ESTRICTO --- */}
                     {myServices.map(srv => (
                         <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
                             <div className="flex-1">
@@ -728,7 +943,7 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
             <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 relative z-10">
                 <div className="text-center mb-10"><h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Planificación<br/><span className="text-orange-600">Postventa</span></h1></div>
                 {adminSetupRequired && role === 'admin' ? (
-                    <div className="space-y-4"><input type="password" placeholder="Nueva Contraseña" class="input-field" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={handleAdminSetup} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button></div>
+                    <div className="space-y-4"><input type="password" placeholder="Nueva Contraseña" className="input-field" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={handleAdminSetup} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button></div>
                 ) : (
                     <div className="space-y-5">
                         <div className="flex bg-slate-100 p-1.5 rounded-xl"><button onClick={() => { setRole('admin'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${role === 'admin' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-400'}`}>Admin</button><button onClick={() => { setRole('tech'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${role === 'tech' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-400'}`}>Técnico</button></div>
@@ -743,7 +958,6 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
     );
 };
 
-// --- APP PRINCIPAL ---
 export default function App() {
     const [user, setUser] = useState(null); 
     const [activeTab, setActiveTab] = useState('kanban'); 
@@ -775,8 +989,9 @@ export default function App() {
             setServices(loadedServices);
         });
         const unsubscribeTechnicians = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), (snapshot) => {
-            const loadedTechs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setTecnicosData(loadedTechs);
+            const loadedTechs = doc => ({ id: doc.id, ...doc.data() });
+            const techs = snapshot.docs.map(loadedTechs);
+            setTecnicosData(techs);
         });
         return () => { unsubscribeServices(); unsubscribeTechnicians(); };
     }, []);
@@ -786,8 +1001,8 @@ export default function App() {
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isManageTechOpen, setIsManageTechOpen] = useState(false);
-    const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); // NUEVO ESTADO PARA MODAL CAMBIO CLAVE ADMIN
-    const [newAdminPasswordToChange, setNewAdminPasswordToChange] = useState(""); // NUEVO ESTADO PARA NUEVA CLAVE ADMIN
+    const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); 
+    const [newAdminPasswordToChange, setNewAdminPasswordToChange] = useState(""); 
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
@@ -827,7 +1042,6 @@ export default function App() {
     const removeTechnician = async (id, name) => { if(window.confirm(`¿Eliminar a ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id)); };
     const updateTechData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id), { [field]: value }); };
 
-    // --- NUEVA FUNCIÓN PARA CAMBIAR CONTRASEÑA DE ADMIN ---
     const handleChangeAdminPassword = async () => {
         if (newAdminPasswordToChange.length < 6) {
             showNotification("La contraseña debe tener al menos 6 caracteres", "error");
@@ -863,6 +1077,13 @@ export default function App() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // --- VALIDACIÓN DE UBICACIÓN PARA MONTAJE ---
+        if (formData.tipoTrabajo.includes('Montaje') && !formData.ubicacion) {
+            showNotification("La ubicación (Coordenadas o Ciudad) es obligatoria para trabajos de Montaje.", "error");
+            return;
+        }
+
         const serviceData = { 
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,
@@ -899,7 +1120,6 @@ export default function App() {
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
         const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${lastSavedService.fInicio} al ${lastSavedService.fFin}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
         
-        // Uso de window.location.href en lugar de window.open evita que los bloqueadores de pop-ups anulen la acción
         window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
     };
 
@@ -946,8 +1166,6 @@ export default function App() {
         });
     }, [formData.fInicio, formData.fFin, services, tecnicosData, editingId]);
 
-    const [techSearch, setTechSearch] = useState("");
-
     if (!user) return <LoginScreen onLogin={setUser} tecnicosData={tecnicosData}/>;
 
     const isAdmin = user.role === 'admin';
@@ -960,8 +1178,6 @@ export default function App() {
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white"><div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black">PLANIFICACIÓN</h2><p className="text-xs font-bold text-orange-600">POSTVENTA</p></div></div><button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden"><X/></button></div>
                 {isAdmin ? (
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                        
-                        {/* --- SECCIÓN DE CONFIGURACIÓN DE ADMIN MODIFICADA --- */}
                         <div className="mb-6 space-y-2">
                             <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
                                 <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Claves</span><ChevronRight className="w-4 h-4 text-slate-300"/>
@@ -1013,7 +1229,9 @@ export default function App() {
                                         <input type="text" placeholder="Contacto Responsable (Ej: Juan Perez - 3512...)" className="input-field text-xs bg-white w-full" value={formData.contactoResponsable} onChange={e=>setFormData({...formData, contactoResponsable:e.target.value})} />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="Ubicación o Google Maps..." className="input-field text-xs bg-white w-full" value={formData.ubicacion} onChange={e=>setFormData({...formData, ubicacion:e.target.value})} />
+                                        <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Ubicación (Ciudad o Coordenadas)</label>
+                                        <input type="text" placeholder="Ej: Neuquén, Argentina o -38.95, -68.05" className="input-field text-xs bg-white w-full" value={formData.ubicacion} onChange={e=>setFormData({...formData, ubicacion:e.target.value})} />
+                                        <p className="text-[9px] text-slate-400 mt-1 leading-tight">Evita enlaces cortos (goo.gl). Ingresa el nombre de la ciudad o lat/lng para que aparezca en el mapa.</p>
                                     </div>
                                 </div>
                             )}
@@ -1035,6 +1253,7 @@ export default function App() {
                     {isAdmin && (
                         <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
                             {[
+                                {id:'map', label:'Mapa Mundial', icon:MapIcon},
                                 {id:'kanban', label:'Tablero', icon:Columns},
                                 {id:'gantt', label:'Cronograma', icon:Calendar},
                                 {id:'sheet', label:'Planilla', icon:List},
@@ -1052,6 +1271,7 @@ export default function App() {
                     
                     {isAdmin ? (
                         <div className="max-w-7xl mx-auto h-full">
+                            {activeTab === 'map' && <MapDashboard services={services} />}
                             {activeTab === 'kanban' && <KanbanBoard services={services} onStatusChange={handleStatusChange} handleEdit={handleEdit}/>}
                             {activeTab === 'gantt' && <GanttChart services={services} mode="operations" handleEdit={handleEdit} isAdmin={isAdmin}/>}
                             {activeTab === 'sheet' && <ServiceSheet sortedServices={services} mode="operations" handleEdit={handleEdit} handleDelete={handleDelete}/>}
@@ -1068,7 +1288,7 @@ export default function App() {
                 </main>
             </div>
 
-            {/* MODALES DE CONFIGURACIÓN DE PERSONAL */}
+            {/* MODALES */}
             <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Personal y Claves" size="lg">
                 <div className="space-y-6">
                     <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">

@@ -153,7 +153,7 @@ const PRELOADED_LOCATIONS = [
   { lat: -34.5153, lng: -58.7658, popupContent: '<b>José C. Paz, Buenos Aires</b>' },
   { lat: -32.9247, lng: -68.7972, popupContent: '<b>Luzuriaga, Mendoza</b>' },
   { lat: -43.7667, lng: -66.4500, popupContent: '<b>Dique Florentino Ameghino, Chubut</b>' },
-  { lat: -29.4131, lng: -66.8557, popupContent: '<b>La Rioja (ET Tardecitas)</b>' },
+  { lat: -29.4131, lng: -66.8557, popupContent: '<b>La Rioja, La Rioja</b>' },
   { lat: -34.9205, lng: -57.9536, popupContent: '<b>La Plata, Buenos Aires</b>' },
   { lat: -51.3536, lng: -70.4373, popupContent: '<b>La Esperanza, Santa Cruz</b>' },
   { lat: -39.0333, lng: -67.5833, popupContent: '<b>General Roca, Río Negro</b>' },

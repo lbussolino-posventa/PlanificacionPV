@@ -1175,6 +1175,13 @@ export default function App() {
             <Modal isOpen={!!loggingHoursService} onClose={()=>setLoggingHoursService(null)} title="Cargar Horas">
                 <div className="space-y-4">
                     <input type="date" className="input-field" value={dailyLogData.date} onChange={e=>setDailyLogData({...dailyLogData, date:e.target.value})}/>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Tipo de Actividad</label>
+                        <select className="input-field" value={dailyLogData.type} onChange={e=>setDailyLogData({...dailyLogData, type:e.target.value})}>
+                            <option value="Trabajo">Trabajo en Sitio</option>
+                            <option value="Viaje">Viaje / Traslado</option>
+                        </select>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                         <input type="time" className="input-field" value={dailyLogData.start} onChange={e=>setDailyLogData({...dailyLogData, start:e.target.value})}/>
                         <input type="time" className="input-field" value={dailyLogData.end} onChange={e=>setDailyLogData({...dailyLogData, end:e.target.value})}/>

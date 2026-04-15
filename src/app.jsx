@@ -43,13 +43,13 @@ const TIPOS_TRABAJO = [
   "Montaje de Transformador", "Supervisión de Montaje", "Asistencia por reclamo", 
   "Servicio de Mantenimiento", "Toma de Muestras (Únicamente)", 
   "Ensayos Eléctricos (Únicamente)", "Supervisión de Puesta en Marcha", 
-  "Desmontaje de Transformador", "Análisis de Aceite", "Vacaciones", "Otro"
+  "Desmontaje de Transformador", "Análisis de Aceite", "Vacaciones", "Estudios Médicos", "Otro"
 ];
 
 const COLORS_TRABAJO = {
   "Montaje de Transformador": "#ea580c", "Supervisión de Montaje": "#f97316", "Asistencia por reclamo": "#ef4444", 
   "Servicio de Mantenimiento": "#10b981", "Toma de Muestras (Únicamente)": "#f59e0b", "Ensayos Eléctricos (Únicamente)": "#8b5cf6", 
-  "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Otro": "#94a3b8"
+  "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Estudios Médicos": "#f43f5e", "Otro": "#94a3b8"
 };
 
 const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
@@ -246,9 +246,10 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
 const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const [selectedGanttService, setSelectedGanttService] = useState(null);
     const visibleServices = useMemo(() => {
-        let base = services; 
-        if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones'); } 
-        else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones'); }
+        let base = services.filter(s => s.estado !== 'Finalizado'); // Ocultar finalizados del calendario general
+        
+        if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); } 
+        else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos'); }
         return base;
     }, [services, mode]);
 
@@ -345,7 +346,8 @@ const KPIs = ({ services }) => {
         return (kpiYear === 'all' || sDate.getFullYear().toString() === kpiYear) && (kpiMonth === 'all' || sDate.getMonth().toString() === kpiMonth); 
     });
     
-    const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
+    // Excluir vacaciones y estudios médicos de los KPIs operativos
+    const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
 
     if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
     
@@ -546,8 +548,8 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
     // --- ORDEN CRONOLÓGICO ESTRICTO Y FILTRO ---
     const filteredSheetServices = useMemo(() => {
         let list;
-        if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
-        else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones');
+        if (mode === 'operations') list = sortedServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
+        else list = sortedServices.filter(s => s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos');
         
         // Filtrar servicios finalizados si el switch está activado
         if (hideCompleted) {
@@ -620,11 +622,15 @@ const TransformerHistory = ({ services }) => {
 
 const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
     const [view, setView] = useState('list'); 
+    const [hideCompleted, setHideCompleted] = useState(false);
+
     const myServices = useMemo(() => {
-        return services
-            .filter(s => s.tecnicos.includes(user.name))
-            .sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
-    }, [services, user.name]);
+        let list = services.filter(s => s.tecnicos.includes(user.name));
+        if (hideCompleted) {
+            list = list.filter(s => s.estado !== 'Finalizado');
+        }
+        return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    }, [services, user.name, hideCompleted]);
 
     return (
         <div className="space-y-6">
@@ -633,7 +639,11 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
                     <h2 className="text-3xl font-extrabold mb-1">Hola, {user.name} 👋</h2>
                     <p className="text-orange-100">Aquí tienes tus servicios asignados.</p>
                 </div>
-                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex">
+                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex items-center">
+                    <label className="flex items-center space-x-2 cursor-pointer px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-white mr-2 border-r border-white/20">
+                        <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-500 w-4 h-4 rounded border-white/30" />
+                        <span className="text-xs font-bold">Ocultar Finalizados</span>
+                    </label>
                     <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
                     <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
                 </div>
@@ -642,11 +652,19 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
 
             {view === 'list' ? (
                 <div className="grid grid-cols-1 gap-5">
+                    {/* --- ORDEN CRONOLÓGICO ESTRICTO --- */}
                     {myServices.map(srv => (
                         <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
                                 <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
+                                
+                                {srv.contactoResponsable && (
+                                    <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
+                                        <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {srv.fInicio} ➔ {srv.fFin}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
                             </div>
                             <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
@@ -777,7 +795,7 @@ export default function App() {
         tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
         postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
         progressLogs: [], dailyLogs: [], closureData: null,
-        trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
+        trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
     });
 
     const [uploadingEvidenceService, setUploadingEvidenceService] = useState(null);
@@ -834,7 +852,7 @@ export default function App() {
                 tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
                 postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
                 progressLogs: [], dailyLogs: [], closureData: null,
-                trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
+                trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
             });
         } else {
             setEditingId(service.id);
@@ -893,7 +911,7 @@ export default function App() {
             tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
             postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
             progressLogs: [], dailyLogs: [], closureData: null,
-            trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: ''
+            trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
         });
     };
 
@@ -958,14 +976,18 @@ export default function App() {
                             {editingId && (<div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-sm flex justify-between items-center"><span className="font-bold text-amber-800">✏️ Editando...</span><button type="button" onClick={resetForm} className="text-xs bg-white border px-2 py-1 rounded">Cancelar</button></div>)}
                             <div>
                                 <label className="text-xs font-bold text-slate-500 mb-1 block">TIPO</label>
-                                <select className="input-field" value={formData.tipoTrabajo} onChange={e=>{const v = e.target.value; setFormData(p=>({...p, tipoTrabajo: v, cliente: v==='Vacaciones'?'INTERNO':p.cliente, oci: v==='Vacaciones'?'VACACIONES':p.oci, vehiculos: v==='Vacaciones'?[]:p.vehiculos}));}}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                <select className="input-field" value={formData.tipoTrabajo} onChange={e=>{
+                                    const v = e.target.value; 
+                                    const isAbsence = v === 'Vacaciones' || v === 'Estudios Médicos';
+                                    setFormData(p=>({...p, tipoTrabajo: v, cliente: isAbsence?'INTERNO':p.cliente, oci: isAbsence?v.toUpperCase():p.oci, vehiculos: isAbsence?[]:p.vehiculos}));
+                                }}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
                                 {formData.tipoTrabajo === 'Otro' && (
                                     <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique el tipo de trabajo..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
                                 )}
                             </div>
-                            {formData.tipoTrabajo !== 'Vacaciones' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
                             <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
-                            {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label><input type="date" className="input-field" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} /></div>)}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label><input type="date" className="input-field" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} /></div>)}
                             
                             <div>
                                 <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS ({availableTechnicians.length} Disp.)</label></div>
@@ -975,22 +997,28 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* --- SECCIÓN DATOS TRANSFORMADOR --- */}
-                            {formData.tipoTrabajo !== 'Vacaciones' && (
+                            {/* --- SECCIÓN DATOS TRANSFORMADOR Y SITIO --- */}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-orange-200 transition-colors animate-in fade-in">
-                                    <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR</label>
+                                    <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR Y SITIO</label>
                                     <div className="grid grid-cols-2 gap-3 mb-2">
                                         <input type="text" placeholder="Nº Fabricación" className="input-field text-xs bg-white" value={formData.trafoFabricacion} onChange={e=>setFormData({...formData, trafoFabricacion:e.target.value})} />
                                         <input type="text" placeholder="Nº Serie" className="input-field text-xs bg-white" value={formData.trafoSerie} onChange={e=>setFormData({...formData, trafoSerie:e.target.value})} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
                                         <input type="text" placeholder="Potencia (KVA)" className="input-field text-xs bg-white" value={formData.trafoPotencia} onChange={e=>setFormData({...formData, trafoPotencia:e.target.value})} />
                                         <input type="text" placeholder="Relación/Tens" className="input-field text-xs bg-white" value={formData.trafoRelacion} onChange={e=>setFormData({...formData, trafoRelacion:e.target.value})} />
+                                    </div>
+                                    <div className="mb-2">
+                                        <input type="text" placeholder="Contacto Responsable (Ej: Juan Perez - 3512...)" className="input-field text-xs bg-white w-full" value={formData.contactoResponsable} onChange={e=>setFormData({...formData, contactoResponsable:e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <input type="text" placeholder="Ubicación o Google Maps..." className="input-field text-xs bg-white w-full" value={formData.ubicacion} onChange={e=>setFormData({...formData, ubicacion:e.target.value})} />
                                     </div>
                                 </div>
                             )}
 
-                            {formData.tipoTrabajo !== 'Vacaciones' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
                             
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 

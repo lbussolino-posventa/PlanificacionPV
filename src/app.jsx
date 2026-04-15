@@ -61,6 +61,8 @@ const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
   { lat: -31.4647, lng: -64.3575, popupContent: '<b>Malagueño, Córdoba</b>' },
+  { lat: -12.0464, lng: -77.0428, popupContent: '<b>Lima, Perú</b>' },
+  { lat: -3.7319, lng: -38.5267, popupContent: '<b>Fortaleza, Brasil</b>' },
   { lat: -28.0652, lng: -67.5644, popupContent: '<b>Tinogasta, Catamarca</b>' },
   { lat: -45.8641, lng: -67.4965, popupContent: '<b>Comodoro Rivadavia, Chubut</b>' },
   { lat: -38.9516, lng: -68.0591, popupContent: '<b>Neuquén, Neuquén</b>' },

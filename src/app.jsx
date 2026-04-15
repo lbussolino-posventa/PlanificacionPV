@@ -106,7 +106,8 @@ const PRELOADED_LOCATIONS = [
   { lat: -38.9960, lng: -64.2591, popupContent: '<b>Río Colorado, Río Negro</b>' },
   { lat: -36.8889, lng: -60.3225, popupContent: '<b>Olavarría, Buenos Aires</b>' },
   { lat: -25.4667, lng: -57.5500, popupContent: '<b>Ypané, Paraguay</b>' },
-  { lat: -39.1167, lng: -65.2667, popupContent: '<b>Pichi Mahuida, Río Negro</b>' },{ lat: -22.9068, lng: -43.1729, popupContent: '<b>Río de Janeiro, Brasil</b>' },
+  { lat: -39.1167, lng: -65.2667, popupContent: '<b>Pichi Mahuida, Río Negro</b>' },
+  { lat: -22.9068, lng: -43.1729, popupContent: '<b>Río de Janeiro, Brasil</b>' },
   { lat: -34.0617, lng: -60.1022, popupContent: '<b>Arrecifes, Buenos Aires</b>' },
   { lat: -22.4694, lng: -43.8250, popupContent: '<b>Barra do Piraí, Brasil</b>' },
   { lat: -23.5936, lng: -49.8339, popupContent: '<b>Siqueira Campos, Brasil</b>' },
@@ -1244,8 +1245,20 @@ export default function App() {
         <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden app-background">
             <div className="absolute inset-0 app-overlay z-0"></div>
             <GlobalStyles />
-            <div className={`fixed inset-y-0 left-0 z-30 w-full lg:w-80 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white"><div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black">PLANIFICACIÓN</h2><p className="text-xs font-bold text-orange-600">POSTVENTA</p></div></div><button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden"><X/></button></div>
+            
+            {/* --- NAVEGACIÓN MÓVIL RESTAURADA --- */}
+            <div className="lg:hidden absolute top-0 left-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-100 z-40 px-4 py-3 flex justify-between items-center shadow-sm">
+                <div className="flex items-center">
+                    <img src={COMPANY_LOGO} alt="Logo" className="w-8 h-8 object-contain mr-2" />
+                    <span className="font-black text-slate-800 text-sm tracking-tight">PLANIFICACIÓN</span>
+                </div>
+                <button onClick={() => setIsSidebarOpen(true)} className="text-orange-600 p-2 bg-orange-50 hover:bg-orange-100 rounded-lg flex items-center transition-colors shadow-sm">
+                    <Menu className="w-5 h-5 mr-1" /> <span className="text-xs font-bold uppercase">Agendar / Menú</span>
+                </button>
+            </div>
+
+            <div className={`fixed inset-y-0 left-0 z-50 w-full lg:w-80 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white"><div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black">PLANIFICACIÓN</h2><p className="text-xs font-bold text-orange-600">POSTVENTA</p></div></div><button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"><X className="w-6 h-6"/></button></div>
                 {isAdmin ? (
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
                         <div className="mb-6 space-y-2">
@@ -1273,7 +1286,23 @@ export default function App() {
                             </div>
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
                             <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
-                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label><input type="date" className="input-field" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} /></div>)}
+                            
+                            {/* --- SECCIÓN ALCANCE Y FECHA SOLICITUD --- */}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-1 block">ALCANCE</label>
+                                        <select className="input-field text-xs bg-white" value={formData.alcance} onChange={e=>setFormData({...formData, alcance:e.target.value})}>
+                                            <option value="Nacional">Nacional</option>
+                                            <option value="Internacional">Internacional</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label>
+                                        <input type="date" className="input-field text-xs bg-white" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} />
+                                    </div>
+                                </div>
+                            )}
                             
                             <div>
                                 <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS ({availableTechnicians.length} Disp.)</label></div>
@@ -1317,7 +1346,8 @@ export default function App() {
                 <div className="p-4 border-t border-slate-100 bg-white"><button onClick={()=>setUser(null)} className="flex items-center justify-center w-full py-2 text-slate-500 hover:text-rose-600 font-medium"><LogOut className="w-4 h-4 mr-2"/> Salir</button></div>
             </div>
 
-            <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+            {/* Espaciado superior en móvil pt-[68px] para compensar la barra nueva */}
+            <div className="flex-1 flex flex-col overflow-hidden relative z-10 pt-[68px] lg:pt-0">
                 <header className="bg-white/95 border-b border-slate-100 px-8 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm backdrop-blur-sm gap-4">
                     <h1 className="text-2xl font-black text-slate-800 tracking-tight hidden md:block">Dashboard</h1>
                     {isAdmin && (
@@ -1363,6 +1393,19 @@ export default function App() {
                         </div>
                     )}
                 </main>
+
+                {/* BOTÓN FLOTANTE MÓVIL PARA AGENDAR RÁPIDO */}
+                {isAdmin && (
+                    <button 
+                        onClick={() => {
+                            resetForm();
+                            setIsSidebarOpen(true);
+                        }}
+                        className="lg:hidden fixed bottom-6 right-6 z-30 bg-orange-600 text-white p-4 rounded-full shadow-xl shadow-orange-300 hover:bg-orange-700 active:scale-95 transition-all"
+                    >
+                        <Plus className="w-6 h-6" />
+                    </button>
+                )}
             </div>
 
             {/* MODALES */}

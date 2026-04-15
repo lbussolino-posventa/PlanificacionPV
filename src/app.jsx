@@ -56,9 +56,19 @@ const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
 const TERCERIZADOS = ["AEREO", "VEHICULO KINTO"];
 const TODOS_VEHICULOS = [...FLOTA_PROPIA, ...TERCERIZADOS];
 
+// --- FORMATEADOR GLOBAL DE FECHAS (DD/MM/AAAA) ---
+const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [y, m, d] = dateStr.split('-');
+        return `${d}/${m}/${y}`;
+    }
+    return dateStr;
+};
+
 // --- PRE-CARGA DEL MAPA MUNDIAL ---
 const PRELOADED_LOCATIONS = [
-  { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
+ { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
   { lat: -31.4647, lng: -64.3575, popupContent: '<b>Malagueño, Córdoba</b>' },
   { lat: -12.0464, lng: -77.0428, popupContent: '<b>Lima, Perú</b>' },
@@ -357,7 +367,7 @@ const TechReportViewer = ({ service }) => {
           </div>
         )}
         {activeTab === 'hours' && (
-          <div><table className="w-full text-xs text-left"><thead><tr className="text-slate-400 border-b border-slate-200"><th className="pb-2">Fecha</th><th className="pb-2">Personal</th><th className="pb-2">Tipo</th><th className="pb-2">Horario</th><th className="pb-2 text-right">Hs Total</th></tr></thead><tbody>{hours.length===0?<tr><td colSpan="6" className="text-center py-4 text-slate-400 italic">Sin horas cargadas.</td></tr>:hours.map((h,i)=>{const start=new Date(`2000-01-01T${h.start}`);const end=new Date(`2000-01-01T${h.end}`);let duration=(end-start)/(1000*60*60);if(duration<0)duration+=24;const workerList=h.workers||[];const techCount=workerList.length>0?workerList.length:1;const totalManHours=duration*techCount;const workerDisplay=(workerList.length>0)?workerList.join(', '):'Equipo Completo';return(<tr key={i} className="border-b border-slate-100 last:border-0"><td className="py-2 font-medium text-slate-700">{h.date}</td><td className="py-2 text-slate-500 max-w-[100px] truncate" title={workerDisplay}>{workerDisplay}</td><td className="py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.type==='Viaje'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700'}`}>{h.type||'Trabajo'}</span></td><td className="py-2 text-slate-600">{h.start} - {h.end}</td><td className="py-2 font-bold text-slate-800 text-right">{totalManHours.toFixed(1)}{techCount>1&&<span className="text-[10px] text-slate-400 font-normal ml-1 block">({duration.toFixed(1)}h x {techCount})</span>}</td></tr>)})}</tbody></table></div>
+          <div><table className="w-full text-xs text-left"><thead><tr className="text-slate-400 border-b border-slate-200"><th className="pb-2">Fecha</th><th className="pb-2">Personal</th><th className="pb-2">Tipo</th><th className="pb-2">Horario</th><th className="pb-2 text-right">Hs Total</th></tr></thead><tbody>{hours.length===0?<tr><td colSpan="6" className="text-center py-4 text-slate-400 italic">Sin horas cargadas.</td></tr>:hours.map((h,i)=>{const start=new Date(`2000-01-01T${h.start}`);const end=new Date(`2000-01-01T${h.end}`);let duration=(end-start)/(1000*60*60);if(duration<0)duration+=24;const workerList=h.workers||[];const techCount=workerList.length>0?workerList.length:1;const totalManHours=duration*techCount;const workerDisplay=(workerList.length>0)?workerList.join(', '):'Equipo Completo';return(<tr key={i} className="border-b border-slate-100 last:border-0"><td className="py-2 font-medium text-slate-700">{formatDate(h.date)}</td><td className="py-2 text-slate-500 max-w-[100px] truncate" title={workerDisplay}>{workerDisplay}</td><td className="py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.type==='Viaje'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700'}`}>{h.type||'Trabajo'}</span></td><td className="py-2 text-slate-600">{h.start} - {h.end}</td><td className="py-2 font-bold text-slate-800 text-right">{totalManHours.toFixed(1)}{techCount>1&&<span className="text-[10px] text-slate-400 font-normal ml-1 block">({duration.toFixed(1)}h x {techCount})</span>}</td></tr>)})}</tbody></table></div>
         )}
         {activeTab === 'closure' && (
           <div>
@@ -410,7 +420,7 @@ const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
                                 <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">{service.oci}</span>{service.alcance === 'Internacional' && <Globe className="w-3 h-3 text-orange-500"/>}</div>
                                 <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{service.cliente}</h4>
                                 <p className="text-[11px] text-slate-500 truncate mb-2">{service.tipoTrabajo === 'Otro' && service.tipoTrabajoOtro ? `Otro: ${service.tipoTrabajoOtro}` : service.tipoTrabajo}</p>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg"><Calendar className="w-3 h-3"/><span>{service.fInicio}</span><span className="text-slate-300">|</span><Users className="w-3 h-3"/><span>{service.tecnicos.length}</span></div>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg"><Calendar className="w-3 h-3"/><span>{formatDate(service.fInicio)}</span><span className="text-slate-300">|</span><Users className="w-3 h-3"/><span>{service.tecnicos.length}</span></div>
                             </div>
                         ))}
                     </div>
@@ -452,10 +462,10 @@ const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-[100] w-80 animate-in zoom-in-95 duration-200">
                   <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50"><div><h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}</h4><span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span></div><button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button></div>
                   <div className="text-xs text-slate-600 space-y-2.5">
-                      <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {selectedGanttService.fSolicitud || 'N/D'}</span></div>
+                      <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {formatDate(selectedGanttService.fSolicitud)}</span></div>
                       <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Cliente:</span> {selectedGanttService.cliente}</span></div>
                       <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Equipo:</span> {selectedGanttService.tecnicos.join(', ')}</span></div>
-                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Ejecución:</span> {selectedGanttService.fInicio} al {selectedGanttService.fFin}</span></div>
+                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Ejecución:</span> {formatDate(selectedGanttService.fInicio)} al {formatDate(selectedGanttService.fFin)}</span></div>
                       
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
                           <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
@@ -623,6 +633,135 @@ const MapDashboard = ({ services }) => {
     }, [services]);
 
     return <div ref={mapContainerRef} className="w-full h-[calc(100vh-220px)] rounded-xl z-0 border border-slate-200 relative overflow-hidden" />;
+};
+
+// --- COMPONENTE MANTENIMIENTO DE VEHÍCULOS ---
+const VehicleMaintenancePanel = ({ records, onSave, onDelete }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [formData, setFormData] = useState({
+        vehiculo: TODOS_VEHICULOS[0],
+        tipo: 'Service / Cambio de Aceite',
+        fecha: new Date().toISOString().split('T')[0],
+        km: '',
+        estado: 'Pendiente',
+        observaciones: ''
+    });
+
+    const reset = () => {
+        setEditingId(null);
+        setFormData({
+            vehiculo: TODOS_VEHICULOS[0], tipo: 'Service / Cambio de Aceite',
+            fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: ''
+        });
+    };
+
+    const handleEdit = (r) => {
+        setEditingId(r.id);
+        setFormData(r);
+        setIsModalOpen(true);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(editingId, formData);
+        setIsModalOpen(false);
+        reset();
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            <div className="flex justify-between items-center bg-white/95 p-5 rounded-2xl border border-slate-100 shadow-sm backdrop-blur-sm">
+                <div>
+                    <h3 className="text-lg font-bold flex items-center text-slate-800"><Truck className="w-5 h-5 mr-3 text-orange-600"/> Mantenimiento de Flota</h3>
+                    <p className="text-xs text-slate-500 font-medium ml-8">Gestión de servicios, seguros y VTV de vehículos</p>
+                </div>
+                <button onClick={() => {reset(); setIsModalOpen(true);}} className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold flex items-center hover:bg-orange-700 transition-all shadow-md active:scale-95"><Plus className="w-4 h-4 mr-2"/> Nuevo Registro</button>
+            </div>
+            
+            <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 overflow-hidden backdrop-blur-sm">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Vehículo</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Tipo de Tarea</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fecha Prog.</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Kilometraje</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th>
+                                <th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {records.sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r => (
+                                <tr key={r.id} className="hover:bg-orange-50/30 transition-colors">
+                                    <td className="px-6 py-4 font-bold text-slate-800">{r.vehiculo}</td>
+                                    <td className="px-6 py-4 text-slate-600 font-medium">{r.tipo}</td>
+                                    <td className="px-6 py-4 text-slate-500 font-medium">{formatDate(r.fecha)}</td>
+                                    <td className="px-6 py-4 text-slate-500 font-mono">{r.km ? `${r.km} km` : '-'}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.estado === 'Realizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{r.estado}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                        <button onClick={() => handleEdit(r)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button>
+                                        <button onClick={() => onDelete(r.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {records.length === 0 && <tr><td colSpan="6" className="text-center py-12 text-slate-400 italic">No hay mantenimientos registrados.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <Modal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} title={editingId ? 'Editar Mantenimiento' : 'Agendar Mantenimiento'}>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Vehículo</label>
+                        <select className="input-field" value={formData.vehiculo} onChange={e=>setFormData({...formData, vehiculo: e.target.value})}>
+                            {TODOS_VEHICULOS.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo de Tarea</label>
+                        <select className="input-field" value={formData.tipo} onChange={e=>setFormData({...formData, tipo: e.target.value})}>
+                            <option value="Service / Cambio de Aceite">Service / Cambio de Aceite</option>
+                            <option value="VTV / RTO">VTV / RTO</option>
+                            <option value="Cambio de Cubiertas">Cambio de Cubiertas</option>
+                            <option value="Renovación Seguro">Renovación Seguro</option>
+                            <option value="Reparación Mecánica">Reparación Mecánica</option>
+                            <option value="Mantenimiento General">Mantenimiento General</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">Fecha</label>
+                            <input type="date" className="input-field text-xs" value={formData.fecha} onChange={e=>setFormData({...formData, fecha: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">Kilometraje (Opcional)</label>
+                            <input type="number" className="input-field text-xs" value={formData.km} onChange={e=>setFormData({...formData, km: e.target.value})} placeholder="Ej: 150000"/>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Estado</label>
+                        <select className="input-field text-xs" value={formData.estado} onChange={e=>setFormData({...formData, estado: e.target.value})}>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Realizado">Realizado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Observaciones</label>
+                        <textarea className="input-field h-24 resize-none text-xs" value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones: e.target.value})} placeholder="Detalles adicionales..."></textarea>
+                    </div>
+                    <button type="submit" className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg active:scale-95">
+                        {editingId ? 'Guardar Cambios' : 'Agendar'}
+                    </button>
+                </form>
+            </Modal>
+        </div>
+    );
 };
 
 const KPIs = ({ services }) => {
@@ -864,7 +1003,7 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
                   <span className="text-xs font-bold text-slate-600">Ocultar Finalizados</span>
               </label>
           </div>
-          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><MapIcon className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{formatDate(s.fSolicitud)}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><MapIcon className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{formatDate(s.fInicio)} <span className="text-slate-300 mx-1">➜</span> {formatDate(s.fFin)}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
       </div>
     );
 };
@@ -895,7 +1034,7 @@ const TransformerHistory = ({ services }) => {
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Relación</span><span className="text-sm font-bold text-slate-700">{srv.trafoRelacion || '-'}</span></div>
                             </div>
                             <div className="flex items-center text-xs text-slate-500 mb-3 space-x-4">
-                                <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {srv.fInicio}</span>
+                                <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {formatDate(srv.fInicio)}</span>
                                 <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
                             </div>
                             <TechReportViewer service={srv} />
@@ -953,7 +1092,7 @@ const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceSe
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {srv.fInicio} ➔ {srv.fFin}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
+                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {formatDate(srv.fInicio)} ➔ {formatDate(srv.fFin)}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
                             </div>
                             <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
                                 {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
@@ -1037,6 +1176,7 @@ export default function App() {
     const isOnline = useOnlineStatus();
     const [services, setServices] = useState([]);
     const [tecnicosData, setTecnicosData] = useState([]);
+    const [maintenanceRecords, setMaintenanceRecords] = useState([]); // NUEVO ESTADO PARA MANTENIMIENTO
     const [lastSavedService, setLastSavedService] = useState(null);
     const [showMsgModal, setShowMsgModal] = useState(false);
 
@@ -1057,6 +1197,7 @@ export default function App() {
         if (!db) return;
         const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) {} };
         initAuth();
+        
         const unsubscribeServices = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'services'), (snapshot) => {
             const loadedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setServices(loadedServices);
@@ -1066,7 +1207,16 @@ export default function App() {
             const techs = snapshot.docs.map(loadedTechs);
             setTecnicosData(techs);
         });
-        return () => { unsubscribeServices(); unsubscribeTechnicians(); };
+        const unsubscribeMaintenance = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), (snapshot) => {
+            const loadedMaintenance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMaintenanceRecords(loadedMaintenance);
+        });
+
+        return () => { 
+            unsubscribeServices(); 
+            unsubscribeTechnicians(); 
+            unsubscribeMaintenance();
+        };
     }, []);
 
     const [notification, setNotification] = useState(null);
@@ -1096,6 +1246,8 @@ export default function App() {
     const [reopeningService, setReopeningService] = useState(null);
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
+    
+    // Tech Admin Form
     const [newTechName, setNewTechName] = useState("");
     const [newTechPhone, setNewTechPhone] = useState("");
     const [newTechEmail, setNewTechEmail] = useState("");
@@ -1130,6 +1282,24 @@ export default function App() {
         }
     };
 
+    // --- NUEVAS FUNCIONES PARA MANTENIMIENTO DE FLOTA ---
+    const handleSaveMaintenance = async (id, data) => {
+        if (id) {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id), data);
+            showNotification("Registro actualizado");
+        } else {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), data);
+            showNotification("Mantenimiento agendado");
+        }
+    };
+
+    const handleDeleteMaintenance = async (id) => {
+        if(window.confirm('¿Seguro que deseas eliminar este registro de mantenimiento?')) {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id));
+            showNotification("Registro eliminado");
+        }
+    };
+
     const handleEdit = (service) => {
         if(service.id === 'new') {
             setEditingId(null);
@@ -1151,7 +1321,6 @@ export default function App() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // --- VALIDACIÓN DE UBICACIÓN PARA MONTAJE ---
         if (formData.tipoTrabajo.includes('Montaje') && !formData.ubicacion) {
             showNotification("La ubicación (Coordenadas o Ciudad) es obligatoria para trabajos de Montaje.", "error");
             return;
@@ -1181,7 +1350,7 @@ export default function App() {
         if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
         const duracion = (new Date(lastSavedService.fFin) - new Date(lastSavedService.fInicio)) / (1000 * 60 * 60 * 24) + 1;
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const msg = `--- TICKET DE SERVICIO TECNICO ---\n\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nINICIO: ${lastSavedService.fInicio}\nFIN: ${lastSavedService.fFin}\nDURACION: ${duracion} dias\nTAREA: ${tipoDetallado}\n\n>> Iniciar en App al llegar.`;
+        const msg = `--- TICKET DE SERVICIO TECNICO ---\n\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nDURACION: ${duracion} dias\nTAREA: ${tipoDetallado}\n\n>> Iniciar en App al llegar.`;
         window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
@@ -1191,7 +1360,7 @@ export default function App() {
         if (!tech || !tech.email) { showNotification(`Sin correo configurado para ${techName}`, "error"); return; }
         const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente} - OCI ${lastSavedService.oci}`);
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${lastSavedService.fInicio} al ${lastSavedService.fFin}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
+        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${formatDate(lastSavedService.fInicio)} al ${formatDate(lastSavedService.fFin)}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
         
         window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
     };
@@ -1248,7 +1417,7 @@ export default function App() {
             <div className="absolute inset-0 app-overlay z-0"></div>
             <GlobalStyles />
             
-            {/* --- NAVEGACIÓN MÓVIL RESTAURADA --- */}
+            {/* --- NAVEGACIÓN MÓVIL --- */}
             <div className="lg:hidden absolute top-0 left-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-100 z-40 px-4 py-3 flex justify-between items-center shadow-sm">
                 <div className="flex items-center">
                     <img src={COMPANY_LOGO} alt="Logo" className="w-8 h-8 object-contain mr-2" />
@@ -1359,6 +1528,7 @@ export default function App() {
                                 {id:'kanban', label:'Tablero', icon:Columns},
                                 {id:'gantt', label:'Cronograma', icon:Calendar},
                                 {id:'sheet', label:'Planilla', icon:List},
+                                {id:'vehicles', label:'Flota', icon:Truck}, // NUEVA PESTAÑA DE MANTENIMIENTO
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
                                 {id:'history', label:'Historial', icon:History},
                                 {id:'kpis', label:'KPIs', icon:BarChart2} 
@@ -1383,6 +1553,7 @@ export default function App() {
                             {activeTab === 'kanban' && <KanbanBoard services={services} onStatusChange={handleStatusChange} handleEdit={handleEdit}/>}
                             {activeTab === 'gantt' && <GanttChart services={services} mode="operations" handleEdit={handleEdit} isAdmin={isAdmin}/>}
                             {activeTab === 'sheet' && <ServiceSheet sortedServices={services} mode="operations" handleEdit={handleEdit} handleDelete={handleDelete}/>}
+                            {activeTab === 'vehicles' && <VehicleMaintenancePanel records={maintenanceRecords} onSave={handleSaveMaintenance} onDelete={handleDeleteMaintenance} />}
                             {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                             {activeTab === 'kpis' && <KPIs services={services} />}

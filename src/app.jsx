@@ -501,24 +501,37 @@ const MapDashboard = ({ services }) => {
                     popupAnchor:  [0, -52]
                 });
 
-                // Carga localizaciones iniciales precargadas
-                PRELOADED_LOCATIONS.forEach(loc => {
-                    if(loc.lat && loc.lng && isMounted) {
-                        window.L.marker([loc.lat, loc.lng], { icon: transformerIcon })
-                            .addTo(map)
-                            .bindPopup(loc.popupContent);
+                // Set para evitar duplicados
+                const uniqueMarkers = [];
+                const locationKeys = new Set();
+                const addressKeys = new Set();
+
+                const addMarkerIfUnique = (lat, lng, popupContent) => {
+                    if (!lat || !lng) return;
+                    const key = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
+                    if (!locationKeys.has(key)) {
+                        locationKeys.add(key);
+                        uniqueMarkers.push({ lat, lng, popupContent });
                     }
-                });
+                };
+
+                // Carga localizaciones iniciales precargadas
+                PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
 
                 // Carga servicios finalizados con ubicación
                 const finishedServices = services.filter(s => s.estado === 'Finalizado' && s.ubicacion);
                 
                 for (const s of finishedServices) {
                     if (!isMounted) break;
+                    
+                    const addrKey = s.ubicacion.trim().toLowerCase();
+                    if (addressKeys.has(addrKey)) continue; // Evitar procesar la misma dirección dos veces
+                    addressKeys.add(addrKey);
+
                     let coords = extractCoordinates(s.ubicacion);
                     
                     // Fallback: Si la regex no encuentra coordenadas y es un string (no un link corto), buscar la ciudad
-                    if (!coords && s.ubicacion.trim().length > 3 && !s.ubicacion.includes('goo.gl')) {
+                    if (!coords && s.ubicacion.trim().length > 3 && !s.ubicacion.includes('goo.gl') && !s.ubicacion.includes('http')) {
                         try {
                             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(s.ubicacion)}&limit=1`);
                             const data = await res.json();
@@ -531,11 +544,20 @@ const MapDashboard = ({ services }) => {
                     }
 
                     if (coords && isMounted) {
-                        window.L.marker([coords.lat, coords.lng], { icon: transformerIcon })
-                            .addTo(map)
-                            .bindPopup(`<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`);
+                        const popupContent = `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`;
+                        addMarkerIfUnique(coords.lat, coords.lng, popupContent);
                     }
                 }
+
+                // Renderizar marcadores únicos en el mapa
+                uniqueMarkers.forEach(loc => {
+                    if (isMounted) {
+                        window.L.marker([loc.lat, loc.lng], { icon: transformerIcon })
+                            .addTo(map)
+                            .bindPopup(loc.popupContent);
+                    }
+                });
+
             } catch (e) {
                 console.error("Error initializing map: ", e);
             }
@@ -1263,7 +1285,13 @@ export default function App() {
                             ].map(tab=>(<button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     )}
-                    {!isAdmin && (<div className="flex bg-slate-100 p-1 rounded-xl"><button onClick={()=>setActiveTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button><button onClick={()=>setActiveTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}><History className="w-4 h-4 mr-2"/> Historial</button></div>)}
+                    {!isAdmin && (
+                        <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
+                            <button onClick={()=>setActiveTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button>
+                            <button onClick={()=>setActiveTab('map')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='map'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4 mr-2"/> Mapa Mundial</button>
+                            <button onClick={()=>setActiveTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><History className="w-4 h-4 mr-2"/> Historial</button>
+                        </div>
+                    )}
                 </header>
 
                 <main className="flex-1 overflow-auto p-4 md:p-6 custom-scrollbar">
@@ -1280,7 +1308,8 @@ export default function App() {
                             {activeTab === 'kpis' && <KPIs services={services} />}
                         </div>
                     ) : (
-                        <div className="max-w-5xl mx-auto">
+                        <div className="max-w-7xl mx-auto h-full">
+                            {activeTab === 'map' && <MapDashboard services={services} />}
                             {activeTab === 'tasks' && <TechPortal services={services} user={user} handleStartService={handleStartService} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} />}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                         </div>

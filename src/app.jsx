@@ -30,10 +30,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-try { enableIndexedDbPersistence(db).catch((err) => {}); } catch (e) {}
+try {
+    enableIndexedDbPersistence(db).catch((err) => {});
+} catch (e) {}
 
+// --- CONSTANTES ---
 const BACKGROUND_IMAGE = "https://i.imgur.com/EfUXRhd.png"; 
 const COMPANY_LOGO = "https://imgur.com/tH8Cu4p.png"; 
+const NPS_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSelB7HDV2efUR4Wz3xohZqp1U9EXSx9LVpu0GN0WDXxMdIX6w/viewform";
 
 const TIPOS_TRABAJO = [
   "Montaje de Transformador", "Supervisión de Montaje", "Asistencia por reclamo", 
@@ -52,16 +56,7 @@ const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
 const TERCERIZADOS = ["AEREO", "VEHICULO KINTO"];
 const TODOS_VEHICULOS = [...FLOTA_PROPIA, ...TERCERIZADOS];
 
-const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [y, m, d] = dateStr.split('-');
-        return `${d}/${m}/${y}`;
-    }
-    return dateStr;
-};
-
-// --- MAPA: LOCACIONES PRE-CARGADAS ---
+// --- PRE-CARGA DEL MAPA MUNDIAL ---
 const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
@@ -223,12 +218,18 @@ const PRELOADED_LOCATIONS = [
   { lat: -53.7883, lng: -67.7032, popupContent: '<b>Río Grande, Tierra del Fuego</b>' }
 ];
 
+// Extrae coordenadas de forma robusta de URLs de google maps o textos
 const extractCoordinates = (str) => {
     if (!str) return null;
+    
+    // 1. Intenta extraer el patrón @lat,lng típico de links largos de Google Maps
     const atMatch = str.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+
+    // 2. Intenta extraer pares separados por coma típicos: -34.123, -58.123
     const commaMatch = str.match(/(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/);
     if (commaMatch) return { lat: parseFloat(commaMatch[1]), lng: parseFloat(commaMatch[2]) };
+    
     return null;
 };
 
@@ -266,16 +267,16 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-// --- COMPONENTES UI COMPARTIDOS ---
+// --- COMPONENTES UI (Modal, FileUploader, etc.) ---
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
   const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
       <div className={`bg-white rounded-2xl shadow-2xl w-full ${sizeClasses} overflow-hidden animate-in flex flex-col max-h-[90vh]`}>
         <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
           <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
       </div>
@@ -283,24 +284,27 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   );
 };
 
-const FileUploader = ({ files, setFiles, label, required = false }) => {
+const FileUploader = ({ files, setFiles, label, required = false, compact = false, isOffline = false }) => {
   const fileInputRef = useRef(null);
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     selectedFiles.forEach(file => {
         const reader = new FileReader();
         reader.onload = (e) => {
-            setFiles(prev => [...prev, { name: file.name, type: file.type, url: e.target.result }]);
+            const newFile = {
+                name: file.name, type: file.type, url: e.target.result, date: new Date().toLocaleDateString(), pendingSync: isOffline
+            };
+            setFiles(prev => [...prev, newFile]);
         };
         reader.readAsDataURL(file);
     });
   };
   const removeFile = (index) => setFiles(files.filter((_, i) => i !== index));
   return (
-    <div className={`mb-4 p-4 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors`}>
+    <div className={`mb-4 ${compact ? 'p-0 border-0' : 'p-4 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50'} transition-colors`}>
       <div className="flex justify-between items-center mb-3">
         <label className="text-sm font-semibold text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>
-        <button type="button" onClick={() => fileInputRef.current.click()} className="text-xs flex items-center bg-white border border-slate-200 text-slate-600 hover:text-orange-600 hover:border-orange-200 px-3 py-1.5 rounded-lg shadow-sm font-medium">
+        <button type="button" onClick={() => fileInputRef.current.click()} className="text-xs flex items-center bg-white border border-slate-200 text-slate-600 hover:text-orange-600 hover:border-orange-200 px-3 py-1.5 rounded-lg transition-all shadow-sm font-medium">
           <Paperclip className="w-3.5 h-3.5 mr-1.5"/> Adjuntar
         </button>
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
@@ -311,246 +315,133 @@ const FileUploader = ({ files, setFiles, label, required = false }) => {
             <div key={idx} className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm text-xs group">
               <div className="flex items-center truncate">
                 {f.type.includes('image') ? <ImageIcon className="w-4 h-4 mr-2 text-orange-500"/> : <FileText className="w-4 h-4 mr-2 text-rose-500"/>}
-                <a href={f.url} target="_blank" rel="noopener noreferrer" className="hover:text-orange-600 truncate max-w-[200px] font-medium text-slate-600">{f.name}</a>
+                <div className="flex flex-col truncate">
+                    <a href={f.url} target="_blank" rel="noopener noreferrer" className="hover:text-orange-600 truncate max-w-[200px] font-medium text-slate-600">{f.name}</a>
+                    {f.pendingSync && <span className="text-[9px] text-amber-500 font-bold flex items-center"><WifiOff className="w-2 h-2 mr-1"/> Pendiente Sync</span>}
+                </div>
               </div>
               <button type="button" onClick={() => removeFile(idx)} className="text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4"/></button>
             </div>
           ))}
         </div>
-      ) : <div className="text-xs text-slate-400 text-center py-2">Sin archivos adjuntos</div>}
+      ) : !compact && <div className="text-xs text-slate-400 text-center py-2">Sin archivos adjuntos</div>}
     </div>
   );
 };
 
-// --- SECCIONES PRINCIPALES ---
-
-const MapDashboard = ({ services }) => {
-    const mapContainerRef = useRef(null);
-
-    useEffect(() => {
-        let isMounted = true;
-        let map = null;
-        let mapInitInterval;
-
-        const initMap = async () => {
-            if (!mapContainerRef.current) return;
-
-            // Limpieza del contenedor para evitar inicialización duplicada
-            if (mapContainerRef.current._leaflet_id) mapContainerRef.current._leaflet_id = null;
-            mapContainerRef.current.innerHTML = '';
-
-            try {
-                map = window.L.map(mapContainerRef.current).setView([-38.4161, -63.6167], 4); 
-                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-                
-                // Forzar repintado para evitar mapas en gris
-                setTimeout(() => { if (map && isMounted) map.invalidateSize(); }, 300);
-
-                const transformerIcon = window.L.icon({
-                    iconUrl: 'https://i.imgur.com/xX4Jhem.png',
-                    iconSize: [62, 52], iconAnchor: [31, 52], popupAnchor: [0, -52]
-                });
-
-                const uniqueMarkers = [];
-                const locationKeys = new Set();
-                const addressKeys = new Set();
-
-                const addMarkerIfUnique = (lat, lng, popupContent) => {
-                    if (!lat || !lng) return;
-                    const key = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
-                    if (!locationKeys.has(key)) {
-                        locationKeys.add(key);
-                        uniqueMarkers.push({ lat, lng, popupContent });
-                    }
-                };
-
-                PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
-
-                const finishedServices = services.filter(s => s.estado === 'Finalizado' && s.ubicacion);
-                for (const s of finishedServices) {
-                    if (!isMounted) break;
-                    const addrKey = s.ubicacion.trim().toLowerCase();
-                    if (addressKeys.has(addrKey)) continue; 
-                    addressKeys.add(addrKey);
-
-                    let coords = extractCoordinates(s.ubicacion);
-                    if (!coords && s.ubicacion.trim().length > 3 && !s.ubicacion.includes('goo.gl') && !s.ubicacion.includes('http')) {
-                        try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(s.ubicacion)}&limit=1`);
-                            const data = await res.json();
-                            if (data && data.length > 0) coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-                        } catch (e) { console.error("Geocoding error", e); }
-                    }
-                    if (coords && isMounted) {
-                        const popupContent = `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`;
-                        addMarkerIfUnique(coords.lat, coords.lng, popupContent);
-                    }
-                }
-
-                uniqueMarkers.forEach(loc => {
-                    if (isMounted) window.L.marker([loc.lat, loc.lng], { icon: transformerIcon }).addTo(map).bindPopup(loc.popupContent);
-                });
-
-            } catch (e) { console.error("Error initializing map: ", e); }
-        };
-
-        // Espera robusta a que Leaflet cargue en el navegador
-        mapInitInterval = setInterval(() => {
-            if (window.L && mapContainerRef.current) {
-                clearInterval(mapInitInterval);
-                initMap();
+const TechReportViewer = ({ service }) => { 
+  const [activeTab, setActiveTab] = useState('logs');
+  const logs = service.progressLogs || [];
+  const hours = service.dailyLogs || [];
+  const closure = service.closureData;
+  return (
+    <div className="mt-6 border-t border-slate-200 pt-6">
+      <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center"><FolderOpen className="w-4 h-4 mr-2 text-orange-600"/> REPORTE TÉCNICO DE CAMPO</h4>
+      <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg mb-4">
+        {['logs', 'hours', 'closure'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === tab ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'logs' ? 'Bitácora Avance' : tab === 'hours' ? 'Parte Diario' : 'Cierre'}</button>
+        ))}
+      </div>
+      <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 min-h-[150px]">
+        {activeTab === 'logs' && (
+          <div className="space-y-3">
+            {logs.length === 0 ? <p className="text-xs text-slate-400 italic text-center">Sin avances registrados.</p> : 
+              logs.sort((a,b) => new Date(b.date) - new Date(a.date)).map((log, idx) => (
+                <div key={idx} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                  <div className="flex justify-between mb-1"><span className="text-xs font-bold text-slate-700">{log.date}</span></div>
+                  <p className="text-xs text-slate-600 mb-2">{log.comment}</p>
+                  <div className="flex gap-2 flex-wrap">{log.files && log.files.map((f, i) => (<a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-blue-50 text-blue-600 text-[10px] rounded border border-blue-100 hover:bg-blue-100"><Paperclip className="w-3 h-3 mr-1"/> {f.name}</a>))}</div>
+                </div>
+              ))
             }
-        }, 500);
-
-        return () => {
-            isMounted = false;
-            clearInterval(mapInitInterval);
-            if (map) map.remove();
-        };
-    }, [services]);
-
-    return (
-        <div className="w-full bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-            <div ref={mapContainerRef} style={{ height: '65vh', minHeight: '500px', width: '100%' }} className="rounded-xl z-0 relative overflow-hidden" />
-        </div>
-    );
+          </div>
+        )}
+        {activeTab === 'hours' && (
+          <div><table className="w-full text-xs text-left"><thead><tr className="text-slate-400 border-b border-slate-200"><th className="pb-2">Fecha</th><th className="pb-2">Personal</th><th className="pb-2">Tipo</th><th className="pb-2">Horario</th><th className="pb-2 text-right">Hs Total</th></tr></thead><tbody>{hours.length===0?<tr><td colSpan="6" className="text-center py-4 text-slate-400 italic">Sin horas cargadas.</td></tr>:hours.map((h,i)=>{const start=new Date(`2000-01-01T${h.start}`);const end=new Date(`2000-01-01T${h.end}`);let duration=(end-start)/(1000*60*60);if(duration<0)duration+=24;const workerList=h.workers||[];const techCount=workerList.length>0?workerList.length:1;const totalManHours=duration*techCount;const workerDisplay=(workerList.length>0)?workerList.join(', '):'Equipo Completo';return(<tr key={i} className="border-b border-slate-100 last:border-0"><td className="py-2 font-medium text-slate-700">{h.date}</td><td className="py-2 text-slate-500 max-w-[100px] truncate" title={workerDisplay}>{workerDisplay}</td><td className="py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.type==='Viaje'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700'}`}>{h.type||'Trabajo'}</span></td><td className="py-2 text-slate-600">{h.start} - {h.end}</td><td className="py-2 font-bold text-slate-800 text-right">{totalManHours.toFixed(1)}{techCount>1&&<span className="text-[10px] text-slate-400 font-normal ml-1 block">({duration.toFixed(1)}h x {techCount})</span>}</td></tr>)})}</tbody></table></div>
+        )}
+        {activeTab === 'closure' && (
+          <div>
+            {!closure ? <p className="text-xs text-slate-400 italic text-center">Servicio no finalizado aún.</p> : (
+              <div className="space-y-3">
+                 <div className={`p-2 rounded text-xs font-bold text-center border ${closure.status === 'Finalizado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>ESTADO FINAL: {closure.status.toUpperCase()}</div>
+                 {closure.reason && <p className="text-xs text-rose-600 font-medium">Motivo: {closure.reasonType} - {closure.reason}</p>}
+                 <div><span className="text-xs font-bold text-slate-500 block mb-1">Observación Final:</span><p className="text-xs text-slate-700 bg-white p-2 rounded border border-slate-100">{closure.observation}</p></div>
+                 <div><span className="text-xs font-bold text-slate-500 block mb-1">Acta y Archivos Finales:</span><div className="flex gap-2 flex-wrap">{closure.files.map((f, i) => (<a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-slate-100 text-slate-600 text-[10px] rounded border border-slate-200 hover:bg-slate-200"><FileCheck className="w-3 h-3 mr-1"/> {f.name}</a>))}</div></div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
-const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenanceStatusChange, handleEditService, handleEditMaintenance }) => {
-    const [boardType, setBoardType] = useState('services');
-
-    const serviceColumns = [
+// --- COMPONENTES KANBAN Y GANTT ---
+const KanbanBoard = ({ services, onStatusChange, handleEdit }) => {
+    const columns = [
         { id: 'Agendado', label: 'Agendado', color: 'bg-amber-50 border-amber-200 text-amber-700' },
         { id: 'En Servicio', label: 'En Servicio', color: 'bg-blue-50 border-blue-200 text-blue-700' },
         { id: 'No Finalizado', label: 'Pendiente / Postergado', color: 'bg-rose-50 border-rose-200 text-rose-700' },
         { id: 'Finalizado', label: 'Finalizado', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
     ];
-
-    const fleetColumns = [
-        { id: 'Pendiente', label: 'Pendiente', color: 'bg-amber-50 border-amber-200 text-amber-700' },
-        { id: 'En Taller', label: 'En Taller / Proceso', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-        { id: 'Realizado', label: 'Realizado', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
-    ];
-
-    const columns = boardType === 'services' ? serviceColumns : fleetColumns;
-
-    const handleDragStart = (e, id, type) => {
-        e.dataTransfer.setData("itemId", id);
-        e.dataTransfer.setData("itemType", type);
-    };
+    const handleDragStart = (e, serviceId) => e.dataTransfer.setData("serviceId", serviceId);
     const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e, targetStatus) => {
-        const itemId = e.dataTransfer.getData("itemId");
-        const itemType = e.dataTransfer.getData("itemType");
-        if (itemId && itemType === boardType) {
-            if (itemType === 'services') onStatusChange(itemId, targetStatus);
-            else if (itemType === 'fleet') onMaintenanceStatusChange(itemId, targetStatus);
-        }
+        const serviceId = e.dataTransfer.getData("serviceId");
+        if (serviceId) onStatusChange(serviceId, targetStatus);
     };
-
-    const getItemsByStatus = (status) => {
-        if (boardType === 'services') {
-            return services.filter(s => {
-                if (status === 'No Finalizado') return s.estado === 'No Finalizado' || s.postergado;
-                if (status === 'Agendado') return s.estado === 'Agendado' && !s.postergado;
-                return s.estado === status && !s.postergado;
-            }).sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
-        } else {
-            return maintenanceRecords.filter(m => m.estado === status).sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-        }
+    const getServicesByStatus = (status) => {
+        return services.filter(s => {
+            if (status === 'No Finalizado') return s.estado === 'No Finalizado' || s.postergado;
+            if (status === 'Agendado') return s.estado === 'Agendado' && !s.postergado;
+            return s.estado === status && !s.postergado;
+        }).sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
     };
-
     return (
-        <div className="flex flex-col h-[calc(100vh-200px)]">
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-4 w-fit shadow-sm border border-slate-200">
-                <button onClick={() => setBoardType('services')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'services' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                    <Wrench className="w-4 h-4 mr-2"/> Servicios Postventa
-                </button>
-                <button onClick={() => setBoardType('fleet')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'fleet' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                    <Truck className="w-4 h-4 mr-2"/> Mantenimiento Flota
-                </button>
-            </div>
-
-            <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-x-auto pb-4">
-                {columns.map(col => {
-                    const items = getItemsByStatus(col.id);
-                    return (
-                        <div key={col.id} className={`kanban-column flex-1 min-w-[280px] bg-slate-100/50 rounded-2xl border ${col.color.split(' ')[1]} flex flex-col`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
-                            <div className={`p-3 rounded-t-xl font-bold border-b text-sm flex justify-between items-center ${col.color}`}>
-                                <span>{col.label}</span><span className="bg-white/50 px-2 py-0.5 rounded text-xs">{items.length}</span>
+        <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-200px)] overflow-x-auto pb-4">
+            {columns.map(col => (
+                <div key={col.id} className={`kanban-column flex-1 min-w-[280px] bg-slate-100/50 rounded-2xl border ${col.color.split(' ')[1]} flex flex-col`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
+                    <div className={`p-3 rounded-t-xl font-bold border-b text-sm flex justify-between items-center ${col.color}`}>
+                        <span>{col.label}</span><span className="bg-white/50 px-2 py-0.5 rounded text-xs">{getServicesByStatus(col.id).length}</span>
+                    </div>
+                    <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-2">
+                        {getServicesByStatus(col.id).map(service => (
+                            <div key={service.id} draggable onDragStart={(e) => handleDragStart(e, service.id)} onClick={() => handleEdit(service)} className="kanban-card bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
+                                <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">{service.oci}</span>{service.alcance === 'Internacional' && <Globe className="w-3 h-3 text-orange-500"/>}</div>
+                                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{service.cliente}</h4>
+                                <p className="text-[11px] text-slate-500 truncate mb-2">{service.tipoTrabajo === 'Otro' && service.tipoTrabajoOtro ? `Otro: ${service.tipoTrabajoOtro}` : service.tipoTrabajo}</p>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg"><Calendar className="w-3 h-3"/><span>{service.fInicio}</span><span className="text-slate-300">|</span><Users className="w-3 h-3"/><span>{service.tecnicos.length}</span></div>
                             </div>
-                            <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-2">
-                                {items.map(item => (
-                                    <div 
-                                        key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, boardType)} 
-                                        onClick={() => boardType === 'services' ? handleEditService(item) : handleEditMaintenance(item)} 
-                                        className="kanban-card bg-white p-3 rounded-xl shadow-sm border border-slate-200 group"
-                                    >
-                                        {boardType === 'services' ? (
-                                            <>
-                                                <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">{item.oci}</span>{item.alcance === 'Internacional' && <Globe className="w-3 h-3 text-orange-500"/>}</div>
-                                                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{item.cliente}</h4>
-                                                <p className="text-[11px] text-slate-500 truncate mb-2">{item.tipoTrabajo === 'Otro' && item.tipoTrabajoOtro ? `Otro: ${item.tipoTrabajoOtro}` : item.tipoTrabajo}</p>
-                                                <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg"><Calendar className="w-3 h-3"/><span>{formatDate(item.fInicio)}</span><span className="text-slate-300">|</span><Users className="w-3 h-3"/><span>{item.tecnicos.length}</span></div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-mono uppercase">Mantenimiento</span></div>
-                                                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{item.vehiculo}</h4>
-                                                <p className="text-[11px] text-slate-500 truncate mb-2">{item.tipo}</p>
-                                                <div className="flex items-center flex-wrap gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg">
-                                                    <div className="flex items-center"><Calendar className="w-3 h-3 mr-1"/><span>{formatDate(item.fecha)}</span></div>
-                                                    <span className="text-slate-300">|</span>
-                                                    <div className="flex items-center"><Activity className="w-3 h-3 mr-1"/><span>{item.km ? `${item.km} km` : 'N/A'}</span></div>
-                                                    {item.tecnicoAsignado && (
-                                                        <>
-                                                            <span className="text-slate-300">|</span>
-                                                            <div className="flex items-center text-indigo-600"><UserCheck className="w-3 h-3 mr-1"/><span className="font-bold truncate max-w-[70px]" title={item.tecnicoAsignado}>{item.tecnicoAsignado}</span></div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };
 
-const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', handleEdit, isAdmin }) => {
+const GanttChart = ({ services, mode = 'operations', handleEdit, isAdmin }) => {
     const [selectedGanttService, setSelectedGanttService] = useState(null);
-    
     const visibleServices = useMemo(() => {
-        let base = services || []; 
-        if (mode === 'operations') { 
-            return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); 
-        } 
-        else if (mode === 'vacations') { 
-            return base.filter(s => s.estado !== 'Finalizado' && (s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos')); 
-        }
-        else if (mode === 'fleet') {
-            return maintenanceRecords.filter(m => m.estado !== 'Realizado').map(m => ({
-                ...m, fInicio: m.fecha, fFin: m.fecha, cliente: m.vehiculo, tipoTrabajo: m.tipo, estado: m.estado,
-                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno']
-            }));
-        }
-        return base.filter(s => s.estado !== 'Finalizado');
-    }, [services, maintenanceRecords, mode]);
+        let base = services.filter(s => s.estado !== 'Finalizado'); 
+        if (mode === 'operations') { return base.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); } 
+        else if (mode === 'vacations') { return base.filter(s => s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos'); }
+        return base;
+    }, [services, mode]);
 
-    if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros pendientes para mostrar en el calendario.</div>;
+    if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros para mostrar.</div>;
     
-    const dates = visibleServices.flatMap(s => [new Date(s.fInicio), new Date(s.fFin)]);
-    const today = new Date(); today.setHours(0,0,0,0);
-    const minDate = new Date(Math.min(...dates, today.getTime())); minDate.setDate(minDate.getDate() - 3);
-    const maxDate = new Date(Math.max(...dates, today.getTime())); maxDate.setDate(maxDate.getDate() + 30);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() - 1); 
+
+    const serviceEndDates = visibleServices.map(s => new Date(s.fFin));
+    let maxDate = new Date(Math.max(...serviceEndDates, today.getTime()));
+    maxDate.setDate(maxDate.getDate() + 30); 
     
     const DAY_WIDTH = 50; 
-    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1); 
+    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); 
     const chartWidth = totalDays * DAY_WIDTH;
 
     const sortedVisibleServices = [...visibleServices].sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
@@ -559,40 +450,25 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
         <div className="bg-white/90 rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden backdrop-blur-sm relative flex flex-col h-[calc(100vh-200px)]">
            {selectedGanttService && (
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-[100] w-80 animate-in zoom-in-95 duration-200">
-                  <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50">
-                      <div>
-                          <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">
-                              {selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}
-                          </h4>
-                          <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button>
-                  </div>
+                  <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50"><div><h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}</h4><span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span></div><button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button></div>
                   <div className="text-xs text-slate-600 space-y-2.5">
-                      {mode !== 'fleet' && <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {formatDate(selectedGanttService.fSolicitud)}</span></div>}
-                      <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Vehículo:' : 'Cliente:'}</span> {selectedGanttService.cliente}</span></div>
-                      <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Responsable:' : 'Equipo:'}</span> {selectedGanttService.tecnicos?.join(', ')}</span></div>
-                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Fecha Prog.:' : 'Ejecución:'}</span> {formatDate(selectedGanttService.fInicio)} {mode !== 'fleet' && `al ${formatDate(selectedGanttService.fFin)}`}</span></div>
+                      <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {selectedGanttService.fSolicitud || 'N/D'}</span></div>
+                      <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Cliente:</span> {selectedGanttService.cliente}</span></div>
+                      <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Equipo:</span> {selectedGanttService.tecnicos.join(', ')}</span></div>
+                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">Ejecución:</span> {selectedGanttService.fInicio} al {selectedGanttService.fFin}</span></div>
                       
-                      {mode === 'operations' && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
-                              <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
-                          </div>
-                      )}
-
-                      {mode === 'fleet' && selectedGanttService.observaciones && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
-                              <span className="font-bold block mb-1">Detalle:</span> {selectedGanttService.observaciones}
-                          </div>
-                      )}
-
-                      <div className="flex items-center mt-2">
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold border w-full text-center ${selectedGanttService.estado==='Finalizado'||selectedGanttService.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':selectedGanttService.estado==='En Servicio'||selectedGanttService.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':selectedGanttService.estado==='No Finalizado'?'bg-rose-50 border-rose-200 text-rose-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                              {selectedGanttService.postergado ? 'POSTERGADO' : selectedGanttService.estado}
-                          </span>
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
+                          <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
+                          <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
+                          <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
                       </div>
+
+                      {selectedGanttService.fSolicitud && (
+                          <div className="bg-orange-50 text-orange-700 p-2 rounded-lg font-bold text-center border border-orange-100">
+                              ⏱️ Lead Time: {Math.max(0, Math.floor((new Date(selectedGanttService.fInicio) - new Date(selectedGanttService.fSolicitud)) / (1000 * 3600 * 24)))} días
+                          </div>
+                      )}
+                      <div className="flex items-center mt-2"><span className={`px-2 py-1 rounded text-[10px] font-bold border w-full text-center ${selectedGanttService.estado==='Finalizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':selectedGanttService.estado==='En Servicio'?'bg-blue-50 border-blue-200 text-blue-700':selectedGanttService.estado==='No Finalizado'?'bg-rose-50 border-rose-200 text-rose-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>{selectedGanttService.postergado ? 'POSTERGADO' : selectedGanttService.estado}</span></div>
                   </div>
               </div>
            )}
@@ -619,36 +495,134 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                      const duration = (new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24) + 1;
                      const leftPos = offsetDays * DAY_WIDTH;
                      const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH); 
-                     
-                     let colorClass = 'bg-orange-500 shadow-orange-200';
-                     if (mode === 'fleet') {
-                         colorClass = srv.estado === 'Realizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'En Taller' ? 'bg-blue-500 shadow-blue-200' : 'bg-indigo-500 shadow-indigo-200';
-                     } else {
-                         colorClass = (srv.tipoTrabajo === 'Vacaciones' || srv.tipoTrabajo === 'Estudios Médicos') ? 'bg-sky-400 shadow-sky-200' : srv.estado === 'Finalizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'No Finalizado' ? 'bg-slate-700 shadow-slate-300' : srv.estado === 'En Servicio' ? 'bg-blue-500 shadow-blue-200' : srv.postergado ? 'bg-rose-500 shadow-rose-200' : 'bg-orange-500 shadow-orange-200';
-                     }
-
+                     const colorClass = srv.tipoTrabajo === 'Vacaciones' ? 'bg-sky-400 shadow-sky-200' : srv.estado === 'Finalizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'No Finalizado' ? 'bg-slate-700 shadow-slate-300' : srv.estado === 'En Servicio' ? 'bg-blue-500 shadow-blue-200' : srv.postergado ? 'bg-rose-500 shadow-rose-200' : 'bg-orange-500 shadow-orange-200';
                      return (
                        <div key={srv.id} className="flex items-center group hover:bg-slate-50 transition-colors h-14 border-b border-slate-50/50">
-                         <div className="sticky left-0 z-10 w-48 pl-4 pr-4 bg-white/95 backdrop-blur-sm border-r border-slate-100 h-full flex items-center justify-end shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
-                             <span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{mode === 'vacations' ? srv.tecnicos[0] : srv.cliente}</span>
-                         </div>
-                         <div className="relative h-full flex-1">
-                             <div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}>
-                                 <span className="truncate drop-shadow-md">
-                                     {mode === 'vacations' ? srv.tipoTrabajo : mode === 'fleet' ? `${srv.cliente} - ${srv.tipoTrabajo}` : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}
-                                 </span>
-                             </div>
-                         </div>
+                         <div className="sticky left-0 z-10 w-48 pl-4 pr-4 bg-white/95 backdrop-blur-sm border-r border-slate-100 h-full flex items-center justify-end shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]"><span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{mode === 'vacations' ? srv.tecnicos[0] : srv.cliente}</span></div>
+                         <div className="relative h-full flex-1"><div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}><span className="truncate drop-shadow-md">{mode === 'vacations' ? '🏖️ Vacaciones' : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}</span></div></div>
                          {isAdmin && <div className="sticky right-0 z-10 w-10 bg-white/50 h-full flex items-center justify-center"><button onClick={() => handleEdit(srv)} className="p-1.5 hover:bg-orange-50 rounded-full text-slate-300 hover:text-orange-600 transition-colors"><Edit2 className="w-3.5 h-3.5"/></button></div>}
                        </div>
                      );
                    })}
                </div>
+               <div className="absolute top-0 bottom-0 pointer-events-none border-l-2 border-orange-400 z-0" style={{ left: `${48 * 4 + DAY_WIDTH}px` }}></div>
                <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">{Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (<div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>))}</div>
              </div>
            </div>
         </div>
     );
+};
+
+// --- COMPONENTE MAPA DEL MUNDO DE SERVICIOS (CON GEOCODIFICACIÓN DINÁMICA) ---
+const MapDashboard = ({ services }) => {
+    const mapContainerRef = useRef(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        let map = null;
+        let initTimeout;
+
+        const initMap = async () => {
+            if (!window.L) {
+                if (isMounted) initTimeout = setTimeout(initMap, 500);
+                return;
+            }
+            if (!mapContainerRef.current) return;
+
+            // Limpieza del contenedor para evitar inicialización duplicada
+            if (mapContainerRef.current._leaflet_id) {
+                mapContainerRef.current._leaflet_id = null;
+            }
+            mapContainerRef.current.innerHTML = '';
+
+            try {
+                map = window.L.map(mapContainerRef.current).setView([-38.4161, -63.6167], 4); 
+                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+                
+                setTimeout(() => {
+                    if (map && isMounted) map.invalidateSize();
+                }, 250);
+
+                const transformerIcon = window.L.icon({
+                    iconUrl: 'https://i.imgur.com/xX4Jhem.png',
+                    iconSize:     [62, 52],
+                    iconAnchor:   [31, 52],
+                    popupAnchor:  [0, -52]
+                });
+
+                // Set para evitar duplicados
+                const uniqueMarkers = [];
+                const locationKeys = new Set();
+                const addressKeys = new Set();
+
+                const addMarkerIfUnique = (lat, lng, popupContent) => {
+                    if (!lat || !lng) return;
+                    const key = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
+                    if (!locationKeys.has(key)) {
+                        locationKeys.add(key);
+                        uniqueMarkers.push({ lat, lng, popupContent });
+                    }
+                };
+
+                // Carga localizaciones iniciales precargadas
+                PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
+
+                // Carga servicios finalizados con ubicación
+                const finishedServices = services.filter(s => s.estado === 'Finalizado' && s.ubicacion);
+                
+                for (const s of finishedServices) {
+                    if (!isMounted) break;
+                    
+                    const addrKey = s.ubicacion.trim().toLowerCase();
+                    if (addressKeys.has(addrKey)) continue; // Evitar procesar la misma dirección dos veces
+                    addressKeys.add(addrKey);
+
+                    let coords = extractCoordinates(s.ubicacion);
+                    
+                    // Fallback: Si la regex no encuentra coordenadas y es un string (no un link corto), buscar la ciudad
+                    if (!coords && s.ubicacion.trim().length > 3 && !s.ubicacion.includes('goo.gl') && !s.ubicacion.includes('http')) {
+                        try {
+                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(s.ubicacion)}&limit=1`);
+                            const data = await res.json();
+                            if (data && data.length > 0) {
+                                coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                            }
+                        } catch (e) {
+                            console.error("Geocoding error", e);
+                        }
+                    }
+
+                    if (coords && isMounted) {
+                        const popupContent = `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`;
+                        addMarkerIfUnique(coords.lat, coords.lng, popupContent);
+                    }
+                }
+
+                // Renderizar marcadores únicos en el mapa
+                uniqueMarkers.forEach(loc => {
+                    if (isMounted) {
+                        window.L.marker([loc.lat, loc.lng], { icon: transformerIcon })
+                            .addTo(map)
+                            .bindPopup(loc.popupContent);
+                    }
+                });
+
+            } catch (e) {
+                console.error("Error initializing map: ", e);
+            }
+        };
+        initMap();
+
+        return () => {
+            isMounted = false;
+            if (initTimeout) clearTimeout(initTimeout);
+            if (map) map.remove();
+        };
+    }, [services]);
+
+    return <div ref={mapContainerRef} className="w-full h-[calc(100vh-220px)] rounded-xl z-0 border border-slate-200 relative overflow-hidden" />;
 };
 
 const KPIs = ({ services }) => {
@@ -668,10 +642,12 @@ const KPIs = ({ services }) => {
     const closedServices = servicesForCalc.filter(s => s.estado === 'Finalizado' || s.estado === 'No Finalizado');
     const successRate = closedServices.length ? ((closedServices.filter(s => s.estado === 'Finalizado').length / closedServices.length) * 100).toFixed(0) : 0;
     const activeServicesCount = servicesForCalc.filter(s => s.estado === 'En Servicio').length;
+    
     const postponedCount = servicesForCalc.filter(s => s.postergado).length;
     const adherenceRate = totalServices ? (((totalServices - postponedCount) / totalServices) * 100).toFixed(0) : 0;
     const totalClaims = servicesForCalc.filter(s => s.tipoTrabajo === "Asistencia por reclamo").length;
     const qualityRate = totalServices ? (((totalServices - totalClaims) / totalServices) * 100).toFixed(1) : 100;
+    
     const cancelledCount = servicesForCalc.filter(s => s.estado === 'No Finalizado').length;
     const cancellationRate = totalServices ? ((cancelledCount / totalServices) * 100).toFixed(1) : 0;
 
@@ -704,6 +680,10 @@ const KPIs = ({ services }) => {
         }
     });
     const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) }];
+    const statusMap = { 'Finalizado': 0, 'No Finalizado': 0, 'En Servicio': 0, 'Agendado': 0 };
+    servicesForCalc.forEach(s => { const st = s.postergado ? 'Agendado' : s.estado; statusMap[st] = (statusMap[st] || 0) + 1; });
+    const dataStatus = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
+    const COLORS_STATUS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
 
     const leadTimeByMonth = {};
     const servicesByMonth = {}; 
@@ -720,7 +700,8 @@ const KPIs = ({ services }) => {
         }
     });
     const dataLeadTimeTrend = Object.entries(leadTimeByMonth).map(([name, data]) => ({
-        name, avg: parseFloat((data.total / data.count).toFixed(1))
+        name,
+        avg: parseFloat((data.total / data.count).toFixed(1))
     }));
     const dataMonthlyVolume = Object.entries(servicesByMonth).map(([name, value]) => ({ name, value }));
 
@@ -750,7 +731,11 @@ const KPIs = ({ services }) => {
                     { title: "Total Servicios", val: totalServices, unit: "", icon: Calendar, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100" },
                     { title: "En Ejecución", val: activeServicesCount, unit: "", icon: Zap, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
                     { title: "Efectividad", val: successRate, unit: "%", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-                    { title: "Calidad", val: qualityRate, unit: "%", icon: ShieldCheck, color: "text-teal-600", bg: "bg-teal-50", border: "border-teal-100" }
+                    { title: "Adherencia", val: adherenceRate, unit: "%", icon: Target, color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-100" },
+                    { title: "Calidad (Sin Reclamos)", val: qualityRate, unit: "%", icon: ShieldCheck, color: "text-teal-600", bg: "bg-teal-50", border: "border-teal-100" },
+                    { title: "Uso Flota Propia", val: ownFleetRate, unit: "%", icon: Truck, color: "text-sky-600", bg: "bg-sky-50", border: "border-sky-100" },
+                    { title: "Prom. Duración", val: avgDuration, unit: "días", icon: Clock, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
+                    { title: "Tasa Cancelación", val: cancellationRate, unit: "%", icon: AlertOctagon, color: "text-red-600", bg: "bg-red-50", border: "border-red-100" },
                 ].map((k, i) => (
                     <div key={i} className={`bg-white p-5 rounded-2xl shadow-sm border ${k.border} hover:shadow-md transition-all duration-300 group`}>
                         <div className="flex justify-between items-start mb-3"><div className={`p-2.5 rounded-xl ${k.bg} ${k.color} group-hover:scale-110 transition-transform duration-300`}><k.icon className="w-5 h-5"/></div></div>
@@ -870,39 +855,16 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
                   {mode === 'operations' ? 'Listado de Operaciones' : 'Listado de Vacaciones'}
               </h3>
               <label className="flex items-center space-x-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-600 w-4 h-4 rounded border-slate-300" />
+                  <input
+                      type="checkbox"
+                      checked={hideCompleted}
+                      onChange={(e) => setHideCompleted(e.target.checked)}
+                      className="accent-orange-600 w-4 h-4 rounded border-slate-300"
+                  />
                   <span className="text-xs font-bold text-slate-600">Ocultar Finalizados</span>
               </label>
           </div>
-          <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
-                  <thead className="bg-slate-50">
-                      <tr>
-                          <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th>
-                          <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>
-                          {mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}
-                          <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th>
-                          <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th>
-                          <th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                      {filteredSheetServices.map(s => (
-                          <tr key={s.id} className="hover:bg-orange-50/30 transition-colors">
-                              <td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td>
-                              <td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>
-                              {mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{formatDate(s.fSolicitud)}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><MapIcon className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}
-                              <td className="px-6 py-4 whitespace-nowrap text-slate-500">{formatDate(s.fInicio)} <span className="text-slate-300 mx-1">➜</span> {formatDate(s.fFin)}</td>
-                              <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td>
-                              <td className="px-6 py-4 text-right whitespace-nowrap">
-                                  <button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button>
-                                  <button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50"><tr><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Tipo' : 'OCI'}</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">{mode === 'vacations' ? 'Técnico' : 'Cliente'}</th>{mode !== 'vacations' && (<><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Solicitud</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Alcance</th></>)}<th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fechas</th><th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th><th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th></tr></thead><tbody className="divide-y divide-slate-50">{filteredSheetServices.map(s => (<tr key={s.id} className="hover:bg-orange-50/30 transition-colors"><td className="px-6 py-4 font-mono font-medium text-slate-700">{mode === 'vacations' ? '🏖️ Vacaciones' : <div>{s.oci}<div className="text-[10px] text-slate-500 font-sans leading-none mt-1">{s.tipoTrabajo === 'Otro' && s.tipoTrabajoOtro ? `Otro: ${s.tipoTrabajoOtro}` : s.tipoTrabajo}</div></div>}</td><td className="px-6 py-4 font-medium text-slate-800">{mode === 'vacations' ? s.tecnicos.join(', ') : s.cliente}</td>{mode !== 'vacations' && (<><td className="px-6 py-4 text-xs text-slate-500">{s.fSolicitud || '-'}</td><td className="px-6 py-4">{s.alcance === 'Internacional' ? <span className="flex items-center text-xs font-bold text-orange-600"><Globe className="w-3 h-3 mr-1"/> INT</span> : <span className="flex items-center text-xs font-bold text-slate-500"><MapIcon className="w-3 h-3 mr-1"/> NAC</span>}</td></>)}<td className="px-6 py-4 whitespace-nowrap text-slate-500">{s.fInicio} <span className="text-slate-300 mx-1">➜</span> {s.fFin}</td><td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${s.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':s.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':s.postergado?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{s.postergado ? 'Postergado' : s.estado}</span></td><td className="px-6 py-4 text-right whitespace-nowrap"><button type="button" onClick={() => handleEdit(s)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button><button type="button" onClick={() => handleDelete(s.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>))}</tbody></table></div>
       </div>
     );
 };
@@ -933,7 +895,7 @@ const TransformerHistory = ({ services }) => {
                                 <div><span className="text-[10px] uppercase font-bold text-slate-400 block">Relación</span><span className="text-sm font-bold text-slate-700">{srv.trafoRelacion || '-'}</span></div>
                             </div>
                             <div className="flex items-center text-xs text-slate-500 mb-3 space-x-4">
-                                <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {formatDate(srv.fInicio)}</span>
+                                <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {srv.fInicio}</span>
                                 <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
                             </div>
                             <TechReportViewer service={srv} />
@@ -942,6 +904,68 @@ const TransformerHistory = ({ services }) => {
                 </div>
             ) : (
                 <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed">No se encontraron servicios con ese número de serie o fabricación.</div>
+            )}
+        </div>
+    );
+};
+
+const TechPortal = ({ services, user, handleStartService, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
+    const [view, setView] = useState('list'); 
+    const [hideCompleted, setHideCompleted] = useState(false);
+
+    const myServices = useMemo(() => {
+        let list = services.filter(s => s.tecnicos.includes(user.name));
+        if (hideCompleted) {
+            list = list.filter(s => s.estado !== 'Finalizado');
+        }
+        return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    }, [services, user.name, hideCompleted]);
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
+                <div className="relative z-10 mb-4 md:mb-0">
+                    <h2 className="text-3xl font-extrabold mb-1">Hola, {user.name} 👋</h2>
+                    <p className="text-orange-100">Aquí tienes tus servicios asignados.</p>
+                </div>
+                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex items-center">
+                    <label className="flex items-center space-x-2 cursor-pointer px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-white mr-2 border-r border-white/20">
+                        <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-500 w-4 h-4 rounded border-white/30" />
+                        <span className="text-xs font-bold">Ocultar Finalizados</span>
+                    </label>
+                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
+                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
+                </div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+            </div>
+
+            {view === 'list' ? (
+                <div className="grid grid-cols-1 gap-5">
+                    {myServices.map(srv => (
+                        <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
+                                <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
+                                
+                                {srv.contactoResponsable && (
+                                    <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
+                                        <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {srv.fInicio} ➔ {srv.fFin}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {srv.vehiculos.join(', ')}</div></div>
+                            </div>
+                            <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                                {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
+                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
+                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
+                                {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <GanttChart services={myServices} mode="mixed" isAdmin={false} handleEdit={()=>{}} />
             )}
         </div>
     );
@@ -965,7 +989,6 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
         };
         checkAdmin();
     }, []);
-
     const handleAdminSetup = async () => {
         if (password.length < 6) { setError('Contraseña > 6 caracteres'); return; }
         setLoading(true);
@@ -975,7 +998,6 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
         } catch (e) { setError("Error"); }
         setLoading(false);
     };
-
     const handleLogin = () => {
         if(role === 'admin') {
             if(adminSetupRequired) { handleAdminSetup(); return; }
@@ -986,9 +1008,7 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
             if(tech && tech.password === password) { onLogin({ name: selectedTechName, role: 'tech', phone: tech.phone }); } else { setError('Credenciales inválidas'); }
         }
     };
-
     const sortedTecnicos = useMemo(() => [...tecnicosData].sort((a, b) => a.name.localeCompare(b.name)), [tecnicosData]);
-
     return (
         <div className="min-h-screen app-background flex items-center justify-center p-4">
             <div className="absolute inset-0 app-overlay"></div>
@@ -1014,12 +1034,11 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
 export default function App() {
     const [user, setUser] = useState(null); 
     const [activeTab, setActiveTab] = useState('kanban'); 
+    const isOnline = useOnlineStatus();
     const [services, setServices] = useState([]);
     const [tecnicosData, setTecnicosData] = useState([]);
-    const [maintenanceRecords, setMaintenanceRecords] = useState([]);
     const [lastSavedService, setLastSavedService] = useState(null);
     const [showMsgModal, setShowMsgModal] = useState(false);
-    const [notification, setNotification] = useState(null);
 
     useEffect(() => {
         if (!document.getElementById('leaflet-css')) {
@@ -1030,7 +1049,7 @@ export default function App() {
         if (!document.getElementById('leaflet-js')) {
             const script = document.createElement('script');
             script.id = 'leaflet-js'; script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; script.async = true;
-            document.head.appendChild(script);
+            document.body.appendChild(script);
         }
     }, []);
 
@@ -1038,42 +1057,33 @@ export default function App() {
         if (!db) return;
         const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) {} };
         initAuth();
-        
         const unsubscribeServices = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'services'), (snapshot) => {
             const loadedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setServices(loadedServices);
         });
         const unsubscribeTechnicians = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), (snapshot) => {
-            const techs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const loadedTechs = doc => ({ id: doc.id, ...doc.data() });
+            const techs = snapshot.docs.map(loadedTechs);
             setTecnicosData(techs);
         });
-        const unsubscribeMaintenance = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), (snapshot) => {
-            const loadedMaintenance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setMaintenanceRecords(loadedMaintenance);
-        });
-
-        return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeMaintenance(); };
+        return () => { unsubscribeServices(); unsubscribeTechnicians(); };
     }, []);
 
+    const [notification, setNotification] = useState(null);
     const showNotification = (msg, type='success') => { setNotification({msg, type}); setTimeout(()=>setNotification(null), 3000); };
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isManageTechOpen, setIsManageTechOpen] = useState(false);
     const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); 
-    
-    const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
-    const [editingMaintenanceId, setEditingMaintenanceId] = useState(null);
-    const [maintenanceFormData, setMaintenanceFormData] = useState({
-        vehiculo: TODOS_VEHICULOS[0], tipo: 'Service / Cambio de Aceite',
-        fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: ''
-    });
-
     const [newAdminPasswordToChange, setNewAdminPasswordToChange] = useState(""); 
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
-        oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
-        tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-        progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
+        oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
+        fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
+        tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
+        postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
+        progressLogs: [], dailyLogs: [], closureData: null,
+        trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
     });
 
     const [uploadingEvidenceService, setUploadingEvidenceService] = useState(null);
@@ -1086,7 +1096,6 @@ export default function App() {
     const [reopeningService, setReopeningService] = useState(null);
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
-    
     const [newTechName, setNewTechName] = useState("");
     const [newTechPhone, setNewTechPhone] = useState("");
     const [newTechEmail, setNewTechEmail] = useState("");
@@ -1094,7 +1103,12 @@ export default function App() {
 
     const addTechnician = async () => {
         if (newTechName && !tecnicosData.find(t => t.name === newTechName.toUpperCase())) {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), { name: newTechName.toUpperCase(), phone: newTechPhone, email: newTechEmail, password: newTechPassword || "1234" });
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), { 
+                name: newTechName.toUpperCase(), 
+                phone: newTechPhone, 
+                email: newTechEmail,
+                password: newTechPassword || "1234" 
+            });
             setNewTechName(""); setNewTechPhone(""); setNewTechEmail(""); setNewTechPassword(""); showNotification("Técnico agregado");
         }
     };
@@ -1102,63 +1116,63 @@ export default function App() {
     const updateTechData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id), { [field]: value }); };
 
     const handleChangeAdminPassword = async () => {
-        if (newAdminPasswordToChange.length < 6) { showNotification("La contraseña debe tener al menos 6 caracteres", "error"); return; }
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: newAdminPasswordToChange }, { merge: true }); showNotification("Contraseña actualizada"); setIsChangeAdminPasswordOpen(false); setNewAdminPasswordToChange(""); } 
-        catch (e) { showNotification("Error al actualizar la contraseña", "error"); }
-    };
-
-    const handleEditMaintenance = (record) => {
-        if(record === 'new') {
-            setEditingMaintenanceId(null);
-            setMaintenanceFormData({ vehiculo: TODOS_VEHICULOS[0], tipo: 'Service / Cambio de Aceite', fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: '' });
-        } else {
-            setEditingMaintenanceId(record.id);
-            setMaintenanceFormData(record);
+        if (newAdminPasswordToChange.length < 6) {
+            showNotification("La contraseña debe tener al menos 6 caracteres", "error");
+            return;
         }
-        setIsMaintenanceModalOpen(true);
-    };
-
-    const handleSaveMaintenance = async (e) => {
-        e.preventDefault();
-        if (editingMaintenanceId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', editingMaintenanceId), maintenanceFormData); showNotification("Registro actualizado"); } 
-        else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), maintenanceFormData); showNotification("Mantenimiento agendado"); }
-        setIsMaintenanceModalOpen(false);
-    };
-
-    const handleMaintenanceStatusChange = async (id, newStatus) => {
-        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id), { estado: newStatus }); showNotification(`Movido a ${newStatus}`); } catch (e) {}
-    };
-
-    const handleDeleteMaintenance = async (id) => {
-        if(window.confirm('¿Seguro que deseas eliminar este registro de mantenimiento?')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id)); showNotification("Registro eliminado"); }
+        try {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: newAdminPasswordToChange }, { merge: true });
+            showNotification("Contraseña de Administrador actualizada");
+            setIsChangeAdminPasswordOpen(false);
+            setNewAdminPasswordToChange("");
+        } catch (e) {
+            showNotification("Error al actualizar la contraseña", "error");
+        }
     };
 
     const handleEdit = (service) => {
         if(service.id === 'new') {
             setEditingId(null);
             setFormData({
-                oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
-                tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-                progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
+                oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
+                fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
+                tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
+                postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
+                progressLogs: [], dailyLogs: [], closureData: null,
+                trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
             });
-        } else { setEditingId(service.id); setFormData(service); }
+        } else {
+            setEditingId(service.id);
+            setFormData(service);
+        }
         setIsSidebarOpen(true);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (formData.tipoTrabajo.includes('Montaje') && !formData.ubicacion) { showNotification("La ubicación es obligatoria para trabajos de Montaje.", "error"); return; }
+        
+        // --- VALIDACIÓN DE UBICACIÓN PARA MONTAJE ---
+        if (formData.tipoTrabajo.includes('Montaje') && !formData.ubicacion) {
+            showNotification("La ubicación (Coordenadas o Ciudad) es obligatoria para trabajos de Montaje.", "error");
+            return;
+        }
+
         const serviceData = { 
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,
             progressLogs: editingId ? (services.find(s=>s.id===editingId)?.progressLogs || []) : [],
             dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : []
         };
-        if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); showNotification("Servicio actualizado"); } 
-        else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); showNotification("Servicio creado"); }
+        if (editingId) { 
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); 
+            showNotification("Servicio actualizado"); 
+        } else { 
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); 
+            showNotification("Servicio creado"); 
+        }
         setLastSavedService(serviceData);
         if (!editingId || (editingId && !formData.postergado)) setShowMsgModal(true);
-        setIsSidebarOpen(false);
+        setIsSidebarOpen(false); resetForm();
     };
 
     const handleWhatsApp = (techName) => {
@@ -1167,24 +1181,37 @@ export default function App() {
         if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
         const duracion = (new Date(lastSavedService.fFin) - new Date(lastSavedService.fInicio)) / (1000 * 60 * 60 * 24) + 1;
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${tipoDetallado}\n>> Iniciar en App al llegar.`;
+        const msg = `--- TICKET DE SERVICIO TECNICO ---\n\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nINICIO: ${lastSavedService.fInicio}\nFIN: ${lastSavedService.fFin}\nDURACION: ${duracion} dias\nTAREA: ${tipoDetallado}\n\n>> Iniciar en App al llegar.`;
         window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     const handleEmail = (techName) => {
         if (!lastSavedService) return;
         const tech = tecnicosData.find(t => t.name === techName);
-        if (!tech || !tech.email) { showNotification(`Sin correo para ${techName}`, "error"); return; }
-        const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente}`);
+        if (!tech || !tech.email) { showNotification(`Sin correo configurado para ${techName}`, "error"); return; }
+        const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente} - OCI ${lastSavedService.oci}`);
         const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nFecha: ${formatDate(lastSavedService.fInicio)} al ${formatDate(lastSavedService.fFin)}\nTarea: ${tipoDetallado}\n\nRevisa el portal.`);
+        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nOCI: ${lastSavedService.oci}\nFecha: ${lastSavedService.fInicio} al ${lastSavedService.fFin}\nTarea: ${tipoDetallado}\n\nPor favor, revisa el portal para más detalles.`);
+        
         window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
+    };
+
+    const resetForm = () => {
+        setEditingId(null);
+        setFormData({
+            oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0],
+            fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
+            tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '',
+            postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
+            progressLogs: [], dailyLogs: [], closureData: null,
+            trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
+        });
     };
 
     const handleStatusChange = async (serviceId, newStatus) => {
         const updateData = { estado: newStatus };
         if (newStatus === 'Agendado') updateData.postergado = false;
-        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', serviceId), updateData); showNotification(`Movido a ${newStatus}`); } catch (e) { }
+        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', serviceId), updateData); showNotification(`Movido a ${newStatus}`); } catch (e) { showNotification("Error", "error"); }
     };
 
     const handleTechEvidenceUpload = async () => { if (evidenceData.files.length === 0 && !evidenceData.comment.trim()) return; const newLog = { id: Date.now(), date: new Date().toLocaleString(), comment: evidenceData.comment, files: evidenceData.files }; const updatedLogs = [...(uploadingEvidenceService.progressLogs || []), newLog]; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', uploadingEvidenceService.id), { progressLogs: updatedLogs }); setUploadingEvidenceService(null); showNotification("Avance subido"); };
@@ -1195,6 +1222,23 @@ export default function App() {
     const handleDelete = (id) => setDeletingId(id);
     const confirmDelete = async () => { if (deletingId) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', deletingId)); setDeletingId(null); showNotification("Servicio eliminado"); } };
 
+    const availableTechnicians = useMemo(() => {
+        if (!formData.fInicio || !formData.fFin) return [];
+        const start = new Date(formData.fInicio);
+        const end = new Date(formData.fFin);
+        if (start > end) return [];
+        return tecnicosData.filter(tech => {
+          const hasConflict = services.some(s => {
+            if (editingId && s.id === editingId) return false;
+            if (!s.tecnicos.includes(tech.name)) return false;
+            const sStart = new Date(s.fInicio);
+            const sEnd = new Date(s.fFin);
+            return (start <= sEnd && end >= sStart);
+          });
+          return !hasConflict;
+        });
+    }, [formData.fInicio, formData.fFin, services, tecnicosData, editingId]);
+
     if (!user) return <LoginScreen onLogin={setUser} tecnicosData={tecnicosData}/>;
 
     const isAdmin = user.role === 'admin';
@@ -1204,6 +1248,7 @@ export default function App() {
             <div className="absolute inset-0 app-overlay z-0"></div>
             <GlobalStyles />
             
+            {/* --- NAVEGACIÓN MÓVIL RESTAURADA --- */}
             <div className="lg:hidden absolute top-0 left-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-100 z-40 px-4 py-3 flex justify-between items-center shadow-sm">
                 <div className="flex items-center">
                     <img src={COMPANY_LOGO} alt="Logo" className="w-8 h-8 object-contain mr-2" />
@@ -1238,12 +1283,13 @@ export default function App() {
                                     setFormData(p=>({...p, tipoTrabajo: v, cliente: isAbsence?'INTERNO':p.cliente, oci: isAbsence?v.toUpperCase():p.oci, vehiculos: isAbsence?[]:p.vehiculos}));
                                 }}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
                                 {formData.tipoTrabajo === 'Otro' && (
-                                    <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
+                                    <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique el tipo de trabajo..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
                                 )}
                             </div>
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
                             <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
                             
+                            {/* --- SECCIÓN ALCANCE Y FECHA SOLICITUD --- */}
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
@@ -1261,12 +1307,14 @@ export default function App() {
                             )}
                             
                             <div>
-                                <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS</label></div>
+                                <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS ({availableTechnicians.length} Disp.)</label></div>
                                 <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
-                                    {tecnicosData.map(t=>(<label key={t.name} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
+                                    {availableTechnicians.map(t=>(<label key={t.name} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
+                                    {availableTechnicians.length === 0 && <p className="text-xs text-center text-slate-400">Selecciona fechas primero</p>}
                                 </div>
                             </div>
 
+                            {/* --- SECCIÓN DATOS TRANSFORMADOR Y SITIO --- */}
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-orange-200 transition-colors animate-in fade-in">
                                     <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR Y SITIO</label>
@@ -1300,6 +1348,7 @@ export default function App() {
                 <div className="p-4 border-t border-slate-100 bg-white"><button onClick={()=>setUser(null)} className="flex items-center justify-center w-full py-2 text-slate-500 hover:text-rose-600 font-medium"><LogOut className="w-4 h-4 mr-2"/> Salir</button></div>
             </div>
 
+            {/* Espaciado superior en móvil pt-[68px] para compensar la barra nueva */}
             <div className="flex-1 flex flex-col overflow-hidden relative z-10 pt-[68px] lg:pt-0">
                 <header className="bg-white/95 border-b border-slate-100 px-8 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm backdrop-blur-sm gap-4">
                     <h1 className="text-2xl font-black text-slate-800 tracking-tight hidden md:block">Dashboard</h1>
@@ -1310,8 +1359,8 @@ export default function App() {
                                 {id:'kanban', label:'Tablero', icon:Columns},
                                 {id:'gantt', label:'Cronograma', icon:Calendar},
                                 {id:'sheet', label:'Planilla', icon:List},
-                                {id:'vehicles', label:'Flota', icon:Truck}, 
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
+                                {id:'history', label:'Historial', icon:History},
                                 {id:'kpis', label:'KPIs', icon:BarChart2} 
                             ].map(tab=>(<button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
@@ -1320,6 +1369,7 @@ export default function App() {
                         <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
                             <button onClick={()=>setActiveTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button>
                             <button onClick={()=>setActiveTab('map')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='map'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4 mr-2"/> Mapa Mundial</button>
+                            <button onClick={()=>setActiveTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><History className="w-4 h-4 mr-2"/> Historial</button>
                         </div>
                     )}
                 </header>
@@ -1330,52 +1380,9 @@ export default function App() {
                     {isAdmin ? (
                         <div className="max-w-7xl mx-auto h-full">
                             {activeTab === 'map' && <MapDashboard services={services} />}
-                            {activeTab === 'kanban' && <KanbanBoard services={services} maintenanceRecords={maintenanceRecords} onStatusChange={handleStatusChange} onMaintenanceStatusChange={handleMaintenanceStatusChange} handleEditService={handleEdit} handleEditMaintenance={handleEditMaintenance}/>}
+                            {activeTab === 'kanban' && <KanbanBoard services={services} onStatusChange={handleStatusChange} handleEdit={handleEdit}/>}
                             {activeTab === 'gantt' && <GanttChart services={services} mode="operations" handleEdit={handleEdit} isAdmin={isAdmin}/>}
                             {activeTab === 'sheet' && <ServiceSheet sortedServices={services} mode="operations" handleEdit={handleEdit} handleDelete={handleDelete}/>}
-                            {activeTab === 'vehicles' && (
-                                <div className="space-y-6">
-                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm flex justify-between items-center">
-                                        <div><h3 className="font-bold text-orange-800 text-sm flex items-center"><Calendar className="w-4 h-4 mr-2"/> Calendario de Mantenimientos</h3><p className="text-xs text-orange-600">Próximos mantenimientos de la flota.</p></div>
-                                        <button onClick={() => handleEditMaintenance('new')} className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold flex items-center hover:bg-orange-700 shadow-md active:scale-95 text-xs"><Plus className="w-4 h-4 mr-2"/> Nuevo Registro</button>
-                                    </div>
-                                    <GanttChart maintenanceRecords={maintenanceRecords} mode="fleet" handleEdit={handleEditMaintenance} isAdmin={isAdmin}/>
-                                    <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                        <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
-                                            <table className="min-w-full divide-y divide-slate-100 text-sm">
-                                                <thead className="bg-slate-50">
-                                                    <tr>
-                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Vehículo</th>
-                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Tipo de Tarea</th>
-                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fecha Prog.</th>
-                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Técnico</th>
-                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th>
-                                                        <th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-50">
-                                                    {maintenanceRecords.sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r => (
-                                                        <tr key={r.id} className="hover:bg-orange-50/30 transition-colors">
-                                                            <td className="px-6 py-4 font-bold text-slate-800">{r.vehiculo}</td>
-                                                            <td className="px-6 py-4 text-slate-600 font-medium">{r.tipo}</td>
-                                                            <td className="px-6 py-4 text-slate-500 font-medium">{formatDate(r.fecha)}</td>
-                                                            <td className="px-6 py-4 text-slate-500">{r.tecnicoAsignado || 'N/A'}</td>
-                                                            <td className="px-6 py-4">
-                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.estado === 'Realizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : r.estado === 'En Taller' ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{r.estado}</span>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                                <button onClick={() => handleEditMaintenance(r)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button>
-                                                                <button onClick={() => handleDeleteMaintenance(r.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    {maintenanceRecords.length === 0 && <tr><td colSpan="6" className="text-center py-12 text-slate-400 italic">No hay mantenimientos registrados.</td></tr>}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                             {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                             {activeTab === 'kpis' && <KPIs services={services} />}
@@ -1384,10 +1391,12 @@ export default function App() {
                         <div className="max-w-7xl mx-auto h-full">
                             {activeTab === 'map' && <MapDashboard services={services} />}
                             {activeTab === 'tasks' && <TechPortal services={services} user={user} handleStartService={handleStartService} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} />}
+                            {activeTab === 'history' && <TransformerHistory services={services} />}
                         </div>
                     )}
                 </main>
 
+                {/* BOTÓN FLOTANTE MÓVIL PARA AGENDAR RÁPIDO */}
                 {isAdmin && (
                     <button 
                         onClick={() => {
@@ -1401,73 +1410,28 @@ export default function App() {
                 )}
             </div>
 
-            {/* --- MODAL PARA MANTENIMIENTO DE FLOTA --- */}
-            <Modal isOpen={isMaintenanceModalOpen} onClose={()=>setIsMaintenanceModalOpen(false)} title={editingMaintenanceId ? 'Editar Mantenimiento' : 'Agendar Mantenimiento'}>
-                <form onSubmit={handleSaveMaintenance} className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block">Vehículo</label>
-                        <select className="input-field" value={maintenanceFormData.vehiculo} onChange={e=>setMaintenanceFormData({...maintenanceFormData, vehiculo: e.target.value})}>
-                            {TODOS_VEHICULOS.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo de Tarea</label>
-                        <select className="input-field" value={maintenanceFormData.tipo} onChange={e=>setMaintenanceFormData({...maintenanceFormData, tipo: e.target.value})}>
-                            <option value="Service / Cambio de Aceite">Service / Cambio de Aceite</option>
-                            <option value="VTV / RTO">VTV / RTO</option>
-                            <option value="Cambio de Cubiertas">Cambio de Cubiertas</option>
-                            <option value="Renovación Seguro">Renovación Seguro</option>
-                            <option value="Reparación Mecánica">Reparación Mecánica</option>
-                            <option value="Mantenimiento General">Mantenimiento General</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block">Técnico Asignado (Para traslado o gestión)</label>
-                        <select className="input-field" value={maintenanceFormData.tecnicoAsignado || ''} onChange={e=>setMaintenanceFormData({...maintenanceFormData, tecnicoAsignado: e.target.value})}>
-                            <option value="">Taller Externo / No requiere</option>
-                            {tecnicosData.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 mb-1 block">Fecha</label>
-                            <input type="date" className="input-field text-xs" value={maintenanceFormData.fecha} onChange={e=>setMaintenanceFormData({...maintenanceFormData, fecha: e.target.value})} required/>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 mb-1 block">Kilometraje</label>
-                            <input type="number" className="input-field text-xs" value={maintenanceFormData.km} onChange={e=>setMaintenanceFormData({...maintenanceFormData, km: e.target.value})} placeholder="Opcional"/>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block">Estado</label>
-                        <select className="input-field text-xs" value={maintenanceFormData.estado} onChange={e=>setMaintenanceFormData({...maintenanceFormData, estado: e.target.value})}>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="En Taller">En Taller / Proceso</option>
-                            <option value="Realizado">Realizado</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 mb-1 block">Observaciones</label>
-                        <textarea className="input-field h-24 resize-none text-xs" value={maintenanceFormData.observaciones} onChange={e=>setMaintenanceFormData({...maintenanceFormData, observaciones: e.target.value})} placeholder="Detalles adicionales..."></textarea>
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setIsMaintenanceModalOpen(false)} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancelar</button>
-                        <button type="submit" className="flex-1 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg active:scale-95">{editingMaintenanceId ? 'Guardar' : 'Agendar'}</button>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* MODALES CONFIGURACIÓN Y OPERATIVOS */}
+            {/* MODALES */}
             <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Personal y Claves" size="lg">
                 <div className="space-y-6">
                     <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label><input className="input-field bg-white text-xs py-2" placeholder="Nombre" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo</label><input type="email" className="input-field bg-white text-xs py-2" placeholder="Email" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} /></div>
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label>
+                            <input className="input-field bg-white text-xs py-2" placeholder="Nombre completo" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label>
+                            <input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo Electrónico</label>
+                            <input type="email" className="input-field bg-white text-xs py-2" placeholder="tecnico@empresa.com" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} />
+                        </div>
                         <div className="flex gap-2">
-                            <div className="flex-1"><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
-                            <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label>
+                                <input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} />
+                            </div>
+                            <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 transition-transform active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
                         </div>
                     </div>
                     <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 font-medium">
@@ -1476,11 +1440,25 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                         {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
                             <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
-                                <div className="flex justify-between items-center mb-2"><span className="font-bold text-sm text-slate-700">{t.name}</span><button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button></div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="font-bold text-sm text-slate-700">{t.name}</span>
+                                    <button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-2"><Phone className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" /></div>
-                                    <div className="flex items-center gap-2"><Mail className="w-3 h-3 text-slate-400 shrink-0" /><input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo" /></div>
-                                    <div className="flex items-center gap-2"><Key className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" /></div>
+                                    <div className="flex items-center gap-2">
+                                        <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo electrónico" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Key className="w-3 h-3 text-slate-400 shrink-0" />
+                                        <input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" />
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -1491,24 +1469,40 @@ export default function App() {
             <Modal isOpen={isChangeAdminPasswordOpen} onClose={()=>setIsChangeAdminPasswordOpen(false)} title="Cambiar Clave de Administrador" size="sm">
                 <div className="space-y-4">
                     <p className="text-sm text-slate-500">Ingresa la nueva contraseña maestra para acceder al panel de administración.</p>
-                    <input type="text" className="input-field font-mono" placeholder="Nueva contraseña (mínimo 6 caracteres)" value={newAdminPasswordToChange} onChange={e => setNewAdminPasswordToChange(e.target.value)}/>
+                    <input 
+                        type="text" 
+                        className="input-field font-mono" 
+                        placeholder="Nueva contraseña (mínimo 6 caracteres)" 
+                        value={newAdminPasswordToChange} 
+                        onChange={e => setNewAdminPasswordToChange(e.target.value)}
+                    />
                     <button onClick={handleChangeAdminPassword} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">Actualizar Contraseña</button>
                 </div>
             </Modal>
 
+            {/* MODALES TÉCNICOS Y OPERATIVOS */}
             <Modal isOpen={showMsgModal} onClose={()=>setShowMsgModal(false)} title="📢 Notificar Asignación">
                  <div className="grid gap-3">
                      {lastSavedService?.tecnicos.length > 0 ? (
                          lastSavedService.tecnicos.map(t => (
                              <div key={t} className="flex flex-col bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-300 hover:shadow-md transition-all group">
-                                 <div className="flex items-center mb-3"><div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mr-3 text-slate-500 font-bold">{t.charAt(0)}</div><span className="font-bold text-slate-700">{t}</span></div>
+                                 <div className="flex items-center mb-3">
+                                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mr-3 text-slate-500 font-bold">{t.charAt(0)}</div>
+                                     <span className="font-bold text-slate-700">{t}</span>
+                                 </div>
                                  <div className="flex gap-2">
-                                     <button onClick={()=>handleWhatsApp(t)} className="flex-1 text-emerald-600 flex items-center justify-center text-xs font-bold bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><MessageCircle className="w-4 h-4 mr-1.5"/> WhatsApp</button>
-                                     <button onClick={()=>handleEmail(t)} className="flex-1 text-blue-600 flex items-center justify-center text-xs font-bold bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"><Mail className="w-4 h-4 mr-1.5"/> Correo</button>
+                                     <button onClick={()=>handleWhatsApp(t)} className="flex-1 text-emerald-600 flex items-center justify-center text-xs font-bold bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors">
+                                         <MessageCircle className="w-4 h-4 mr-1.5"/> WhatsApp
+                                     </button>
+                                     <button onClick={()=>handleEmail(t)} className="flex-1 text-blue-600 flex items-center justify-center text-xs font-bold bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-colors">
+                                         <Mail className="w-4 h-4 mr-1.5"/> Correo
+                                     </button>
                                  </div>
                              </div>
                          ))
-                     ) : (<p className="text-center text-slate-500 text-sm py-4">No hay técnicos asignados para notificar.</p>)}
+                     ) : (
+                         <p className="text-center text-slate-500 text-sm py-4">No hay técnicos asignados para notificar.</p>
+                     )}
                  </div>
             </Modal>
 
@@ -1553,17 +1547,35 @@ export default function App() {
                         <button onClick={()=>setClosureData({...closureData, status:'No Finalizado'})} className={`flex-1 py-2 border rounded-lg font-bold ${closureData.status==='No Finalizado'?'bg-rose-50 border-rose-500 text-rose-700':'bg-white'}`}>No Finalizado</button>
                     </div>
                     <textarea className="input-field h-24" placeholder="Observaciones finales..." value={closureData.observation} onChange={e=>setClosureData({...closureData, observation:e.target.value})}/>
+                    
                     {closureData.status === 'No Finalizado' && (
                         <div className="space-y-3 animate-in slide-in-from-top-2">
                             <label className="block text-xs font-bold text-rose-500 uppercase tracking-wider">Especificar Motivo</label>
-                            <select className="input-field border-rose-200 focus:border-rose-500" value={closureData.reasonType} onChange={e => setClosureData({...closureData, reasonType: e.target.value, reason: e.target.value === 'Otros' ? '' : e.target.value})}>
-                                <option value="">Seleccione un motivo...</option><option value="Falta de repuestos">Falta de repuestos</option><option value="Falta de tiempo">Falta de tiempo</option><option value="Cliente ausente/no disponible">Cliente ausente / no disponible</option><option value="Condiciones climáticas adversas">Condiciones climáticas adversas</option><option value="Problema técnico no resuelto">Problema técnico no resuelto</option><option value="Otros">Otros (Especificar)</option>
+                            <select 
+                                className="input-field border-rose-200 focus:border-rose-500 focus:ring-rose-100" 
+                                value={closureData.reasonType} 
+                                onChange={e => setClosureData({...closureData, reasonType: e.target.value, reason: e.target.value === 'Otros' ? '' : e.target.value})}
+                            >
+                                <option value="">Seleccione un motivo...</option>
+                                <option value="Falta de repuestos">Falta de repuestos</option>
+                                <option value="Falta de tiempo">Falta de tiempo</option>
+                                <option value="Cliente ausente/no disponible">Cliente ausente / no disponible</option>
+                                <option value="Condiciones climáticas adversas">Condiciones climáticas adversas</option>
+                                <option value="Problema técnico no resuelto">Problema técnico no resuelto</option>
+                                <option value="Otros">Otros (Especificar)</option>
                             </select>
+                            
                             {closureData.reasonType === 'Otros' && (
-                                <input className="input-field border-rose-200 focus:border-rose-500 animate-in fade-in" placeholder="Describa el motivo..." value={closureData.reason} onChange={e=>setClosureData({...closureData, reason:e.target.value})}/>
+                                <input 
+                                    className="input-field border-rose-200 focus:border-rose-500 focus:ring-rose-100 animate-in fade-in" 
+                                    placeholder="Describa el motivo..." 
+                                    value={closureData.reason} 
+                                    onChange={e=>setClosureData({...closureData, reason:e.target.value})}
+                                />
                             )}
                         </div>
                     )}
+                    
                     <FileUploader files={closureData.files} setFiles={(f)=>setClosureData({...closureData, files:f})} label="ACTA"/>
                     <button onClick={handleTechClosure} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Confirmar Cierre</button>
                 </div>
@@ -1579,9 +1591,9 @@ export default function App() {
 
             <Modal isOpen={!!deletingId} onClose={()=>setDeletingId(null)} title="Eliminar">
                 <div className="text-center p-4">
-                    <p className="mb-4">¿Seguro deseas eliminar este registro permanentemente?</p>
+                    <p className="mb-4">¿Seguro deseas eliminar este servicio permanentemente?</p>
                     <div className="flex gap-2 justify-center">
-                        <button onClick={()=>setDeletingId(null)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold text-slate-600">Cancelar</button>
+                        <button onClick={()=>setDeletingId(null)} className="px-4 py-2 bg-slate-100 rounded-lg">Cancelar</button>
                         <button onClick={confirmDelete} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold">Eliminar</button>
                     </div>
                 </div>

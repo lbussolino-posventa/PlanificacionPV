@@ -248,7 +248,7 @@ const GlobalStyles = () => (
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     .app-background { background-image: url('${BACKGROUND_IMAGE}'); background-size: cover; background-position: center; background-repeat: no-repeat; }
-    .app-overlay { background-color: rgba(255, 255, 255, 0.90); backdrop-filter: blur(2px); }
+    .app-overlay { background-color: rgba(255, 255, 255, 0.60); backdrop-filter: blur(1px); }
     .kanban-column { transition: background-color 0.2s; }
     .kanban-card { transition: transform 0.2s, box-shadow 0.2s; cursor: grab; }
     .kanban-card:active { cursor: grabbing; transform: scale(1.02); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }

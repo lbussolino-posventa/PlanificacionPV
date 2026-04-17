@@ -257,8 +257,8 @@ const GlobalStyles = () => (
         background-repeat: no-repeat; 
     }
     .app-overlay { 
-        background-color: rgba(2, 6, 23, 0.80) !important; /* Azul marino profundo translúcido */
-        backdrop-filter: blur(4px) !important; 
+        background-color: rgba(2, 6, 23, 0.60) !important; /* Azul marino profundo translúcido */
+        backdrop-filter: blur(1px) !important; 
     }
 
     /* 3. PANELES TRANSLÚCIDOS (Sidebar, Columnas, Cabecera) */
@@ -1481,7 +1481,6 @@ export default function App() {
     const handleDelete = (id) => setDeletingId(id);
     const confirmDelete = async () => { if (deletingId) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', deletingId)); setDeletingId(null); showNotification("Servicio eliminado"); } };
 
-    // --- CÁLCULO DE ALERTAS Y NOTIFICACIONES ADMINISTRATIVAS ---
     const todayStr = new Date().toISOString().split('T')[0];
     const tomorrowDate = new Date();
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -1526,7 +1525,7 @@ export default function App() {
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asignación</p>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {editingId && (<div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-sm flex justify-between items-center"><span className="font-bold text-amber-800">✏️ Editando...</span><button type="button" onClick={resetForm} className="text-xs bg-white border px-2 py-1 rounded">Cancelar</button></div>)}
-                            <div>
+                            <div className="form-group">
                                 <label className="text-xs font-bold text-slate-500 mb-1 block">TIPO</label>
                                 <select className="input-field" value={formData.tipoTrabajo} onChange={e=>{
                                     const v = e.target.value; 
@@ -1537,27 +1536,27 @@ export default function App() {
                                     <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
                                 )}
                             </div>
-                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
-                            <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
+                            <div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
                             
                             {/* --- SECCIÓN ALCANCE Y FECHA SOLICITUD --- */}
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div>
+                                    <div className="form-group">
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">ALCANCE</label>
                                         <select className="input-field text-xs bg-white" value={formData.alcance} onChange={e=>setFormData({...formData, alcance:e.target.value})}>
                                             <option value="Nacional">Nacional</option>
                                             <option value="Internacional">Internacional</option>
                                         </select>
                                     </div>
-                                    <div>
+                                    <div className="form-group">
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label>
                                         <input type="date" className="input-field text-xs bg-white" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} />
                                     </div>
                                 </div>
                             )}
                             
-                            <div>
+                            <div className="form-group">
                                 <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS</label></div>
                                 <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
                                     {tecnicosData.map(t=>(<label key={t.id} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
@@ -1587,12 +1586,12 @@ export default function App() {
                                 </div>
                             )}
 
-                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">
                                 {vehiculosData.map(v=>(<label key={v.id} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v.name)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v.name)} onChange={()=>{const newVehs = formData.vehiculos.includes(v.name) ? formData.vehiculos.filter(x=>x!==v.name) : [...formData.vehiculos, v.name]; setFormData({...formData, vehiculos: newVehs});}}/>{v.name}</label>))}
                                 {vehiculosData.length === 0 && <span className="text-[10px] text-slate-400">Sin vehículos en la base.</span>}
                             </div></div>)}
                             
-                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
+                            <div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 
                             <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
                         </form>

@@ -10,12 +10,10 @@ import {
   Columns, Wrench, BarChart, Factory, Mail
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
-
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc, query, where, enableIndexedDbPersistence } from 'firebase/firestore';
 
-// --- CONFIGURACIÓN DE FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAWQ46JCuYTKZz0IKyp_cwkIla9vii1Fpc",
   authDomain: "planificacion-posventa.firebaseapp.com",
@@ -48,10 +46,6 @@ const COLORS_TRABAJO = {
   "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Estudios Médicos": "#f43f5e", "Otro": "#94a3b8"
 };
 
-const FLOTA_PROPIA = ["KANGOO PLG", "KANGOO AF", "TRANSIT AG", "MASTER AB"];
-const TERCERIZADOS = ["AEREO", "VEHICULO KINTO"];
-const TODOS_VEHICULOS = [...FLOTA_PROPIA, ...TERCERIZADOS];
-
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -61,7 +55,6 @@ const formatDate = (dateStr) => {
     return dateStr;
 };
 
-// --- MAPA: LOCACIONES PRE-CARGADAS ---
 const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
@@ -244,7 +237,6 @@ const useOnlineStatus = () => {
     return isOnline;
 };
 
-// --- ESTILOS GLOBALES ---
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -266,7 +258,6 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-// --- COMPONENTES UI COMPARTIDOS ---
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
   const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
@@ -289,20 +280,16 @@ const FileUploader = ({ files, setFiles, label, required = false }) => {
     const selectedFiles = Array.from(e.target.files);
     selectedFiles.forEach(file => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            setFiles(prev => [...prev, { name: file.name, type: file.type, url: e.target.result }]);
-        };
+        reader.onload = (e) => setFiles(prev => [...prev, { name: file.name, type: file.type, url: e.target.result }]);
         reader.readAsDataURL(file);
     });
   };
   const removeFile = (index) => setFiles(files.filter((_, i) => i !== index));
   return (
-    <div className={`mb-4 p-4 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors`}>
+    <div className="mb-4 p-4 border border-dashed border-slate-300 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
       <div className="flex justify-between items-center mb-3">
         <label className="text-sm font-semibold text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>
-        <button type="button" onClick={() => fileInputRef.current.click()} className="text-xs flex items-center bg-white border border-slate-200 text-slate-600 hover:text-orange-600 hover:border-orange-200 px-3 py-1.5 rounded-lg shadow-sm font-medium">
-          <Paperclip className="w-3.5 h-3.5 mr-1.5"/> Adjuntar
-        </button>
+        <button type="button" onClick={() => fileInputRef.current.click()} className="text-xs flex items-center bg-white border border-slate-200 text-slate-600 hover:text-orange-600 px-3 py-1.5 rounded-lg shadow-sm font-medium"><Paperclip className="w-3.5 h-3.5 mr-1.5"/> Adjuntar</button>
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
       </div>
       {files.length > 0 ? (
@@ -321,8 +308,6 @@ const FileUploader = ({ files, setFiles, label, required = false }) => {
     </div>
   );
 };
-
-// --- SECCIONES PRINCIPALES ---
 
 const TechReportViewer = ({ service }) => { 
   const [activeTab, setActiveTab] = useState('logs');
@@ -381,23 +366,15 @@ const MapDashboard = ({ services }) => {
 
         const initMap = async () => {
             if (!mapContainerRef.current) return;
-
-            // Limpieza del contenedor para evitar inicialización duplicada
             if (mapContainerRef.current._leaflet_id) mapContainerRef.current._leaflet_id = null;
             mapContainerRef.current.innerHTML = '';
 
             try {
                 map = window.L.map(mapContainerRef.current).setView([-38.4161, -63.6167], 4); 
                 window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-                
-                // Forzar repintado para evitar mapas en gris
                 setTimeout(() => { if (map && isMounted) map.invalidateSize(); }, 300);
 
-                const transformerIcon = window.L.icon({
-                    iconUrl: 'https://i.imgur.com/xX4Jhem.png',
-                    iconSize: [62, 52], iconAnchor: [31, 52], popupAnchor: [0, -52]
-                });
-
+                const transformerIcon = window.L.icon({ iconUrl: 'https://i.imgur.com/xX4Jhem.png', iconSize: [62, 52], iconAnchor: [31, 52], popupAnchor: [0, -52] });
                 const uniqueMarkers = [];
                 const locationKeys = new Set();
                 const addressKeys = new Set();
@@ -405,10 +382,7 @@ const MapDashboard = ({ services }) => {
                 const addMarkerIfUnique = (lat, lng, popupContent) => {
                     if (!lat || !lng) return;
                     const key = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
-                    if (!locationKeys.has(key)) {
-                        locationKeys.add(key);
-                        uniqueMarkers.push({ lat, lng, popupContent });
-                    }
+                    if (!locationKeys.has(key)) { locationKeys.add(key); uniqueMarkers.push({ lat, lng, popupContent }); }
                 };
 
                 PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
@@ -429,31 +403,21 @@ const MapDashboard = ({ services }) => {
                         } catch (e) { console.error("Geocoding error", e); }
                     }
                     if (coords && isMounted) {
-                        const popupContent = `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`;
-                        addMarkerIfUnique(coords.lat, coords.lng, popupContent);
+                        addMarkerIfUnique(coords.lat, coords.lng, `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`);
                     }
                 }
 
                 uniqueMarkers.forEach(loc => {
                     if (isMounted) window.L.marker([loc.lat, loc.lng], { icon: transformerIcon }).addTo(map).bindPopup(loc.popupContent);
                 });
-
             } catch (e) { console.error("Error initializing map: ", e); }
         };
 
-        // Espera robusta a que Leaflet cargue en el navegador
         mapInitInterval = setInterval(() => {
-            if (window.L && mapContainerRef.current) {
-                clearInterval(mapInitInterval);
-                initMap();
-            }
+            if (window.L && mapContainerRef.current) { clearInterval(mapInitInterval); initMap(); }
         }, 500);
 
-        return () => {
-            isMounted = false;
-            clearInterval(mapInitInterval);
-            if (map) map.remove();
-        };
+        return () => { isMounted = false; clearInterval(mapInitInterval); if (map) map.remove(); };
     }, [services]);
 
     return (
@@ -481,10 +445,7 @@ const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenan
 
     const columns = boardType === 'services' ? serviceColumns : fleetColumns;
 
-    const handleDragStart = (e, id, type) => {
-        e.dataTransfer.setData("itemId", id);
-        e.dataTransfer.setData("itemType", type);
-    };
+    const handleDragStart = (e, id, type) => { e.dataTransfer.setData("itemId", id); e.dataTransfer.setData("itemType", type); };
     const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e, targetStatus) => {
         const itemId = e.dataTransfer.getData("itemId");
@@ -510,12 +471,8 @@ const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenan
     return (
         <div className="flex flex-col h-[calc(100vh-200px)]">
             <div className="flex bg-slate-100 p-1 rounded-xl mb-4 w-fit shadow-sm border border-slate-200">
-                <button onClick={() => setBoardType('services')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'services' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                    <Wrench className="w-4 h-4 mr-2"/> Servicios Postventa
-                </button>
-                <button onClick={() => setBoardType('fleet')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'fleet' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                    <Truck className="w-4 h-4 mr-2"/> Mantenimiento Flota
-                </button>
+                <button onClick={() => setBoardType('services')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'services' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Wrench className="w-4 h-4 mr-2"/> Servicios Postventa</button>
+                <button onClick={() => setBoardType('fleet')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center ${boardType === 'fleet' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Truck className="w-4 h-4 mr-2"/> Mantenimiento Flota</button>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-x-auto pb-4">
@@ -523,16 +480,10 @@ const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenan
                     const items = getItemsByStatus(col.id);
                     return (
                         <div key={col.id} className={`kanban-column flex-1 min-w-[280px] bg-slate-100/50 rounded-2xl border ${col.color.split(' ')[1]} flex flex-col`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
-                            <div className={`p-3 rounded-t-xl font-bold border-b text-sm flex justify-between items-center ${col.color}`}>
-                                <span>{col.label}</span><span className="bg-white/50 px-2 py-0.5 rounded text-xs">{items.length}</span>
-                            </div>
+                            <div className={`p-3 rounded-t-xl font-bold border-b text-sm flex justify-between items-center ${col.color}`}><span>{col.label}</span><span className="bg-white/50 px-2 py-0.5 rounded text-xs">{items.length}</span></div>
                             <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-2">
                                 {items.map(item => (
-                                    <div 
-                                        key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, boardType)} 
-                                        onClick={() => boardType === 'services' ? handleEditService(item) : handleEditMaintenance(item)} 
-                                        className="kanban-card bg-white p-3 rounded-xl shadow-sm border border-slate-200 group"
-                                    >
+                                    <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, boardType)} onClick={() => boardType === 'services' ? handleEditService(item) : handleEditMaintenance(item)} className="kanban-card bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
                                         {boardType === 'services' ? (
                                             <>
                                                 <div className="flex justify-between items-start mb-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">{item.oci}</span>{item.alcance === 'Internacional' && <Globe className="w-3 h-3 text-orange-500"/>}</div>
@@ -546,15 +497,8 @@ const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenan
                                                 <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1">{item.vehiculo}</h4>
                                                 <p className="text-[11px] text-slate-500 truncate mb-2">{item.tipo}</p>
                                                 <div className="flex items-center flex-wrap gap-2 text-[10px] text-slate-400 bg-slate-50 p-1.5 rounded-lg">
-                                                    <div className="flex items-center"><Calendar className="w-3 h-3 mr-1"/><span>{formatDate(item.fecha)}</span></div>
-                                                    <span className="text-slate-300">|</span>
-                                                    <div className="flex items-center"><Activity className="w-3 h-3 mr-1"/><span>{item.km ? `${item.km} km` : 'N/A'}</span></div>
-                                                    {item.tecnicoAsignado && (
-                                                        <>
-                                                            <span className="text-slate-300">|</span>
-                                                            <div className="flex items-center text-indigo-600"><UserCheck className="w-3 h-3 mr-1"/><span className="font-bold truncate max-w-[70px]" title={item.tecnicoAsignado}>{item.tecnicoAsignado}</span></div>
-                                                        </>
-                                                    )}
+                                                    <div className="flex items-center"><Calendar className="w-3 h-3 mr-1"/><span>{formatDate(item.fecha)}</span></div><span className="text-slate-300">|</span><div className="flex items-center"><Activity className="w-3 h-3 mr-1"/><span>{item.km ? `${item.km} km` : 'N/A'}</span></div>
+                                                    {item.tecnicoAsignado && (<><span className="text-slate-300">|</span><div className="flex items-center text-indigo-600"><UserCheck className="w-3 h-3 mr-1"/><span className="font-bold truncate max-w-[70px]" title={item.tecnicoAsignado}>{item.tecnicoAsignado}</span></div></>)}
                                                 </div>
                                             </>
                                         )}
@@ -574,25 +518,30 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
     
     const visibleServices = useMemo(() => {
         let base = services || []; 
-        if (mode === 'operations') { 
-            return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo !== 'Vacaciones'); 
-        } 
-        else if (mode === 'vacations') { 
-            return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo === 'Vacaciones'); 
-        }
+        if (mode === 'operations') { return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); } 
+        else if (mode === 'vacations') { return base.filter(s => s.estado !== 'Finalizado' && (s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos')); }
         else if (mode === 'fleet') {
-            return maintenanceRecords.filter(m => m.estado !== 'Realizado').map(m => ({
+            return (maintenanceRecords||[]).filter(m => m.estado !== 'Realizado').map(m => ({
                 ...m, fInicio: m.fecha, fFin: m.fecha, cliente: m.vehiculo, tipoTrabajo: m.tipo, estado: m.estado,
-                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno']
+                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno'], esMantenimiento: true
             }));
+        } else if (mode === 'mixed') {
+            const activeServices = base.filter(s => s.estado !== 'Finalizado');
+            const activeMaintenance = (maintenanceRecords||[]).filter(m => m.estado !== 'Realizado').map(m => ({
+                ...m, fInicio: m.fecha, fFin: m.fecha, cliente: m.vehiculo, tipoTrabajo: m.tipo, estado: m.estado,
+                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno'], esMantenimiento: true
+            }));
+            return [...activeServices, ...activeMaintenance];
         }
         return base.filter(s => s.estado !== 'Finalizado');
     }, [services, maintenanceRecords, mode]);
 
     if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros pendientes para mostrar en el calendario.</div>;
     
-    const dates = visibleServices.flatMap(s => [new Date(s.fInicio), new Date(s.fFin)]);
+    const dates = visibleServices.flatMap(s => [new Date(s.fInicio), new Date(s.fFin)]).filter(d => !isNaN(d.getTime()));
     const today = new Date(); today.setHours(0,0,0,0);
+    if(dates.length === 0) dates.push(today);
+    
     const minDate = new Date(Math.min(...dates, today.getTime())); minDate.setDate(minDate.getDate() - 3);
     const maxDate = new Date(Math.max(...dates, today.getTime())); maxDate.setDate(maxDate.getDate() + 30);
     
@@ -608,31 +557,26 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-[100] w-80 animate-in zoom-in-95 duration-200">
                   <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50">
                       <div>
-                          <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">
-                              {selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}
-                          </h4>
+                          <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}</h4>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span>
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button>
                   </div>
                   <div className="text-xs text-slate-600 space-y-2.5">
-                      {mode !== 'fleet' && <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {formatDate(selectedGanttService.fSolicitud)}</span></div>}
-                      <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Vehículo:' : 'Cliente:'}</span> {selectedGanttService.cliente}</span></div>
-                      <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Responsable:' : 'Equipo:'}</span> {selectedGanttService.tecnicos?.join(', ')}</span></div>
-                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{mode === 'fleet' ? 'Fecha Prog.:' : 'Ejecución:'}</span> {formatDate(selectedGanttService.fInicio)} {mode !== 'fleet' && `al ${formatDate(selectedGanttService.fFin)}`}</span></div>
+                      {!selectedGanttService.esMantenimiento && <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {formatDate(selectedGanttService.fSolicitud)}</span></div>}
+                      <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Vehículo:' : 'Cliente:'}</span> {selectedGanttService.cliente}</span></div>
+                      <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Responsable:' : 'Equipo:'}</span> {selectedGanttService.tecnicos?.join(', ')}</span></div>
+                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Fecha Prog.:' : 'Ejecución:'}</span> {formatDate(selectedGanttService.fInicio)} {!selectedGanttService.esMantenimiento && `al ${formatDate(selectedGanttService.fFin)}`}</span></div>
                       
-                      {mode === 'operations' && (
+                      {!selectedGanttService.esMantenimiento && selectedGanttService.tipoTrabajo !== 'Vacaciones' && selectedGanttService.tipoTrabajo !== 'Estudios Médicos' && (
                           <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
                               <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
                               <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
                               <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
                           </div>
                       )}
-
-                      {mode === 'fleet' && selectedGanttService.observaciones && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
-                              <span className="font-bold block mb-1">Detalle:</span> {selectedGanttService.observaciones}
-                          </div>
+                      {selectedGanttService.esMantenimiento && selectedGanttService.observaciones && (
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2"><span className="font-bold block mb-1">Detalle:</span> {selectedGanttService.observaciones}</div>
                       )}
 
                       <div className="flex items-center mt-2">
@@ -668,21 +612,21 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                      const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH); 
                      
                      let colorClass = 'bg-orange-500 shadow-orange-200';
-                     if (mode === 'fleet') {
+                     if (srv.esMantenimiento) {
                          colorClass = srv.estado === 'Realizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'En Taller' ? 'bg-blue-500 shadow-blue-200' : 'bg-indigo-500 shadow-indigo-200';
                      } else {
-                         colorClass = (srv.tipoTrabajo === 'Vacaciones') ? 'bg-sky-400 shadow-sky-200' : srv.estado === 'Finalizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'No Finalizado' ? 'bg-slate-700 shadow-slate-300' : srv.estado === 'En Servicio' ? 'bg-blue-500 shadow-blue-200' : srv.postergado ? 'bg-rose-500 shadow-rose-200' : 'bg-orange-500 shadow-orange-200';
+                         colorClass = (srv.tipoTrabajo === 'Vacaciones' || srv.tipoTrabajo === 'Estudios Médicos') ? 'bg-sky-400 shadow-sky-200' : srv.estado === 'Finalizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'No Finalizado' ? 'bg-slate-700 shadow-slate-300' : srv.estado === 'En Servicio' ? 'bg-blue-500 shadow-blue-200' : srv.postergado ? 'bg-rose-500 shadow-rose-200' : 'bg-orange-500 shadow-orange-200';
                      }
 
                      return (
                        <div key={srv.id} className="flex items-center group hover:bg-slate-50 transition-colors h-14 border-b border-slate-50/50">
                          <div className="sticky left-0 z-10 w-48 pl-4 pr-4 bg-white/95 backdrop-blur-sm border-r border-slate-100 h-full flex items-center justify-end shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
-                             <span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{mode === 'vacations' ? (srv.tecnicos?.[0] || 'N/A') : srv.cliente}</span>
+                             <span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{srv.tipoTrabajo === 'Vacaciones' ? (srv.tecnicos?.[0] || 'N/A') : srv.cliente}</span>
                          </div>
                          <div className="relative h-full flex-1">
                              <div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}>
                                  <span className="truncate drop-shadow-md">
-                                     {mode === 'vacations' ? srv.tipoTrabajo : mode === 'fleet' ? `${srv.cliente} - ${srv.tipoTrabajo}` : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}
+                                     {srv.tipoTrabajo === 'Vacaciones' ? srv.tipoTrabajo : srv.esMantenimiento ? `${srv.cliente} - ${srv.tipoTrabajo}` : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}
                                  </span>
                              </div>
                          </div>
@@ -707,7 +651,7 @@ const KPIs = ({ services }) => {
         return (kpiYear === 'all' || sDate.getFullYear().toString() === kpiYear) && (kpiMonth === 'all' || sDate.getMonth().toString() === kpiMonth); 
     });
     
-    const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones');
+    const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
 
     if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
     
@@ -1027,77 +971,85 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                         <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-500 w-4 h-4 rounded border-white/30" />
                         <span className="text-xs font-bold">Ocultar Finalizados</span>
                     </label>
+                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
+                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
                 </div>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
             </div>
 
             <div className="space-y-6">
-                {myMaintenance.length > 0 && (
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Truck className="w-4 h-4 mr-2"/> Tareas de Flota Asignadas</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {myMaintenance.map(m => (
-                                <div key={m.id} className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-5 flex flex-col relative overflow-hidden group">
-                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
-                                    <div className="pl-2">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':m.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>{m.estado}</span>
-                                            <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">Mantenimiento de Vehículo</span>
-                                        </div>
-                                        <h3 className="font-black text-lg text-slate-800 mb-1">{m.vehiculo}</h3>
-                                        <p className="text-sm text-slate-600 mb-3">{m.tipo} {m.observaciones && `- ${m.observaciones}`}</p>
-                                        <div className="flex items-center gap-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 w-fit">
-                                            <div className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {formatDate(m.fecha)}</div>
-                                            {m.km && <div className="flex items-center"><Activity className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {m.km} km</div>}
-                                        </div>
-                                        
-                                        {/* Botón para marcar el vehículo como entregado en taller */}
-                                        {m.estado === 'Pendiente' && (
-                                            <button 
-                                                onClick={() => onMaintenanceStatusChange(m.id, 'En Taller')}
-                                                className="mt-4 w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex justify-center items-center text-xs shadow-md active:scale-95"
-                                            >
-                                                <CheckCircle className="w-4 h-4 mr-2"/> Entregado / En Taller
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {myServices.length > 0 && (
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
-                        <div className="grid grid-cols-1 gap-5">
-                            {myServices.map(srv => (
-                                <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
-                                        <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
-                                        
-                                        {srv.contactoResponsable && (
-                                            <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
-                                                <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                {view === 'list' ? (
+                    <>
+                        {myMaintenance.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Truck className="w-4 h-4 mr-2"/> Tareas de Flota Asignadas</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {myMaintenance.map(m => (
+                                        <div key={m.id} className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-5 flex flex-col relative overflow-hidden group">
+                                            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                                            <div className="pl-2">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':m.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>{m.estado}</span>
+                                                    <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">Mantenimiento de Vehículo</span>
+                                                </div>
+                                                <h3 className="font-black text-lg text-slate-800 mb-1">{m.vehiculo}</h3>
+                                                <p className="text-sm text-slate-600 mb-3">{m.tipo} {m.observaciones && `- ${m.observaciones}`}</p>
+                                                <div className="flex items-center gap-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 w-fit">
+                                                    <div className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {formatDate(m.fecha)}</div>
+                                                    {m.km && <div className="flex items-center"><Activity className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {m.km} km</div>}
+                                                </div>
+                                                
+                                                {/* Botón para marcar el vehículo como entregado en taller */}
+                                                {m.estado === 'Pendiente' && (
+                                                    <button 
+                                                        onClick={() => onMaintenanceStatusChange(m.id, 'En Taller')}
+                                                        className="mt-4 w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex justify-center items-center text-xs shadow-md active:scale-95"
+                                                    >
+                                                        <CheckCircle className="w-4 h-4 mr-2"/> Entregado / En Taller
+                                                    </button>
+                                                )}
                                             </div>
-                                        )}
-
-                                        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {formatDate(srv.fInicio)} ➔ {formatDate(srv.fFin)}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {(srv.vehiculos || []).join(', ')}</div></div>
-                                    </div>
-                                    <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
-                                        {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
-                                        {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
-                                        {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
-                                        {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {myServices.length === 0 && myMaintenance.length === 0 && (
-                    <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No tienes tareas ni mantenimientos asignados actualmente.</div>
+                            </div>
+                        )}
+
+                        {myServices.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
+                                <div className="grid grid-cols-1 gap-5">
+                                    {myServices.map(srv => (
+                                        <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
+                                                <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
+                                                
+                                                {srv.contactoResponsable && (
+                                                    <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
+                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                                                    </div>
+                                                )}
+
+                                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {formatDate(srv.fInicio)} ➔ {formatDate(srv.fFin)}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {(srv.vehiculos || []).join(', ')}</div></div>
+                                            </div>
+                                            <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                                                {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
+                                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
+                                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
+                                                {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {myServices.length === 0 && myMaintenance.length === 0 && (
+                            <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No tienes tareas ni mantenimientos asignados actualmente.</div>
+                        )}
+                    </>
+                ) : (
+                    <GanttChart services={myServices} maintenanceRecords={myMaintenance} mode="mixed" isAdmin={false} handleEdit={()=>{}} />
                 )}
             </div>
         </div>
@@ -1175,6 +1127,7 @@ export default function App() {
     const isOnline = useOnlineStatus();
     const [services, setServices] = useState([]);
     const [tecnicosData, setTecnicosData] = useState([]);
+    const [vehiculosData, setVehiculosData] = useState([]);
     const [maintenanceRecords, setMaintenanceRecords] = useState([]);
     const [lastSavedService, setLastSavedService] = useState(null);
     const [notification, setNotification] = useState(null);
@@ -1212,24 +1165,29 @@ export default function App() {
             const techs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setTecnicosData(techs);
         });
+        const unsubscribeVehicles = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'vehicles'), (snapshot) => {
+            const vehs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setVehiculosData(vehs);
+        });
         const unsubscribeMaintenance = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), (snapshot) => {
             const loadedMaintenance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setMaintenanceRecords(loadedMaintenance);
         });
 
-        return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeMaintenance(); };
+        return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeVehicles(); unsubscribeMaintenance(); };
     }, []);
 
     const showNotification = (msg, type='success') => { setNotification({msg, type}); setTimeout(()=>setNotification(null), 3000); };
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isManageTechOpen, setIsManageTechOpen] = useState(false);
+    const [manageTab, setManageTab] = useState('techs');
     const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); 
     
     const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
     const [editingMaintenanceId, setEditingMaintenanceId] = useState(null);
     const [maintenanceFormData, setMaintenanceFormData] = useState({
-        vehiculo: TODOS_VEHICULOS[0], tipo: 'Service / Cambio de Aceite',
+        vehiculo: '', tipo: 'Service / Cambio de Aceite',
         fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: ''
     });
 
@@ -1256,6 +1214,8 @@ export default function App() {
     const [newTechPhone, setNewTechPhone] = useState("");
     const [newTechEmail, setNewTechEmail] = useState("");
     const [newTechPassword, setNewTechPassword] = useState("");
+    
+    const [newVehicleName, setNewVehicleName] = useState("");
 
     const resetForm = () => {
         setEditingId(null);
@@ -1275,6 +1235,14 @@ export default function App() {
     const removeTechnician = async (id, name) => { if(window.confirm(`¿Eliminar a ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id)); };
     const updateTechData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id), { [field]: value }); };
 
+    const addVehicle = async () => {
+        if (newVehicleName && !vehiculosData.find(v => v.name === newVehicleName.toUpperCase())) {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'vehicles'), { name: newVehicleName.toUpperCase() });
+            setNewVehicleName(""); showNotification("Vehículo agregado");
+        }
+    };
+    const removeVehicle = async (id, name) => { if(window.confirm(`¿Eliminar vehículo ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'vehicles', id)); };
+
     const handleChangeAdminPassword = async () => {
         if (newAdminPasswordToChange.length < 6) { showNotification("La contraseña debe tener al menos 6 caracteres", "error"); return; }
         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: newAdminPasswordToChange }, { merge: true }); showNotification("Contraseña actualizada"); setIsChangeAdminPasswordOpen(false); setNewAdminPasswordToChange(""); } 
@@ -1284,7 +1252,7 @@ export default function App() {
     const handleEditMaintenance = (record) => {
         if(record === 'new') {
             setEditingMaintenanceId(null);
-            setMaintenanceFormData({ vehiculo: TODOS_VEHICULOS[0], tipo: 'Service / Cambio de Aceite', fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: '' });
+            setMaintenanceFormData({ vehiculo: vehiculosData.length > 0 ? vehiculosData[0].name : '', tipo: 'Service / Cambio de Aceite', fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: '' });
         } else {
             setEditingMaintenanceId(record.id);
             setMaintenanceFormData(record);
@@ -1399,7 +1367,7 @@ export default function App() {
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
                         <div className="mb-6 space-y-2">
                             <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
-                                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Claves</span><ChevronRight className="w-4 h-4 text-slate-300"/>
+                                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Flota</span><ChevronRight className="w-4 h-4 text-slate-300"/>
                             </button>
                             <button onClick={() => setIsChangeAdminPasswordOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
                                 <span className="flex items-center"><Key className="w-4 h-4 mr-2 text-slate-400"/> Clave Administrador</span><ChevronRight className="w-4 h-4 text-slate-300"/>
@@ -1443,7 +1411,7 @@ export default function App() {
                             <div>
                                 <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS</label></div>
                                 <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
-                                    {tecnicosData.map(t=>(<label key={t.name} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
+                                    {tecnicosData.map(t=>(<label key={t.id} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
                                 </div>
                             </div>
 
@@ -1470,7 +1438,10 @@ export default function App() {
                                 </div>
                             )}
 
-                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">{TODOS_VEHICULOS.map(v=>(<label key={v} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v)} onChange={()=>{const newVehs = formData.vehiculos.includes(v) ? formData.vehiculos.filter(x=>x!==v) : [...formData.vehiculos, v]; setFormData({...formData, vehiculos: newVehs});}}/>{v}</label>))}</div></div>)}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">
+                                {vehiculosData.map(v=>(<label key={v.id} className={`text-[10px] px-2 py-1 border rounded cursor-pointer ${formData.vehiculos.includes(v.name)?'bg-slate-800 text-white':''}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v.name)} onChange={()=>{const newVehs = formData.vehiculos.includes(v.name) ? formData.vehiculos.filter(x=>x!==v.name) : [...formData.vehiculos, v.name]; setFormData({...formData, vehiculos: newVehs});}}/>{v.name}</label>))}
+                                {vehiculosData.length === 0 && <span className="text-[10px] text-slate-400">Sin vehículos en la base.</span>}
+                            </div></div>)}
                             
                             <div><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
 
@@ -1622,7 +1593,8 @@ export default function App() {
                     <div>
                         <label className="text-xs font-bold text-slate-500 mb-1 block">Vehículo</label>
                         <select className="input-field" value={maintenanceFormData.vehiculo} onChange={e=>setMaintenanceFormData({...maintenanceFormData, vehiculo: e.target.value})}>
-                            {TODOS_VEHICULOS.map(v => <option key={v} value={v}>{v}</option>)}
+                            {vehiculosData.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                            {vehiculosData.length === 0 && <option value="">Sin vehículos registrados</option>}
                         </select>
                     </div>
                     <div>
@@ -1674,33 +1646,59 @@ export default function App() {
             </Modal>
 
             {/* MODALES CONFIGURACIÓN Y OPERATIVOS */}
-            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Personal y Claves" size="lg">
-                <div className="space-y-6">
-                    <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label><input className="input-field bg-white text-xs py-2" placeholder="Nombre" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
-                        <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo</label><input type="email" className="input-field bg-white text-xs py-2" placeholder="Email" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} /></div>
-                        <div className="flex gap-2">
-                            <div className="flex-1"><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
-                            <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
+            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Gestión de Personal y Flota" size="lg">
+                <div className="flex space-x-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                    <button type="button" onClick={() => setManageTab('techs')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${manageTab === 'techs' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>Técnicos y Claves</button>
+                    <button type="button" onClick={() => setManageTab('vehicles')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${manageTab === 'vehicles' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>Flota de Vehículos</button>
+                </div>
+
+                {manageTab === 'techs' ? (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label><input className="input-field bg-white text-xs py-2" placeholder="Nombre" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo</label><input type="email" className="input-field bg-white text-xs py-2" placeholder="Email" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} /></div>
+                            <div className="flex gap-2">
+                                <div className="flex-1"><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
+                                <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                        <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 font-medium">
+                            💡 Puedes editar las contraseñas y datos directamente en los campos de abajo. ¡Se guardan automáticamente!
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
+                                <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
+                                    <div className="flex justify-between items-center mb-2"><span className="font-bold text-sm text-slate-700">{t.name}</span><button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button></div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2"><Phone className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" /></div>
+                                        <div className="flex items-center gap-2"><Mail className="w-3 h-3 text-slate-400 shrink-0" /><input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo" /></div>
+                                        <div className="flex items-center gap-2"><Key className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" /></div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 font-medium">
-                        💡 Puedes editar las contraseñas y datos directamente en los campos de abajo. ¡Se guardan automáticamente!
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                        {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
-                            <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
-                                <div className="flex justify-between items-center mb-2"><span className="font-bold text-sm text-slate-700">{t.name}</span><button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button></div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2"><Phone className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" /></div>
-                                    <div className="flex items-center gap-2"><Mail className="w-3 h-3 text-slate-400 shrink-0" /><input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo" /></div>
-                                    <div className="flex items-center gap-2"><Key className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" /></div>
-                                </div>
+                ) : (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 flex gap-2 items-end mb-6">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-indigo-700 uppercase mb-1 block">Patente / Nombre del Vehículo</label>
+                                <input className="input-field bg-white text-xs py-2" placeholder="Ej: KANGOO AB 123 CD" value={newVehicleName} onChange={e=>setNewVehicleName(e.target.value.toUpperCase())} />
                             </div>
-                        ))}
+                            <button type="button" onClick={addVehicle} className="bg-indigo-600 text-white px-4 rounded-lg font-bold hover:bg-indigo-700 active:scale-95 h-[34px] shadow-md flex items-center"><Plus className="w-4 h-4 mr-1"/> Agregar</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            {vehiculosData.sort((a,b)=>a.name.localeCompare(b.name)).map(v=>(
+                                <div key={v.id} className="p-4 border border-slate-200 rounded-xl bg-white shadow-sm flex justify-between items-center group hover:border-indigo-200 transition-all">
+                                    <div className="flex items-center"><Truck className="w-5 h-5 text-indigo-400 mr-3"/><span className="font-bold text-sm text-slate-700">{v.name}</span></div>
+                                    <button type="button" onClick={() => removeVehicle(v.id, v.name)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            ))}
+                            {vehiculosData.length === 0 && <div className="col-span-2 text-center text-slate-400 text-sm py-4">No hay vehículos registrados. Agrega uno arriba.</div>}
+                        </div>
                     </div>
-                </div>
+                )}
             </Modal>
 
             <Modal isOpen={isChangeAdminPasswordOpen} onClose={()=>setIsChangeAdminPasswordOpen(false)} title="Cambiar Clave de Administrador" size="sm">

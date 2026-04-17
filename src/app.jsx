@@ -240,18 +240,126 @@ const useOnlineStatus = () => {
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-    .input-field { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; background-color: #f8fafc; outline: none; transition: all 0.2s; font-size: 0.9rem; color: #334155; }
-    .input-field:focus { border-color: #f97316; background-color: #ffffff; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1); }
+    
+    /* 1. TIPOGRAFÍA Y FONDO BASE */
+    body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #020617; /* Azul muy oscuro base */
+        color: #f8fafc; 
+        letter-spacing: 0.01em;
+    }
+
+    /* 2. IMAGEN DE FONDO Y OVERLAY */
+    .app-background { 
+        background-image: url('${BACKGROUND_IMAGE}'); 
+        background-size: cover; 
+        background-position: center; 
+        background-repeat: no-repeat; 
+    }
+    .app-overlay { 
+        background-color: rgba(2, 6, 23, 0.80) !important; /* Azul marino profundo translúcido */
+        backdrop-filter: blur(4px) !important; 
+    }
+
+    /* 3. PANELES TRANSLÚCIDOS (Sidebar, Columnas, Cabecera) */
+    /* Aquí creamos el "Azul oscuro medio transparente" elegante */
+    .bg-white, .bg-slate-50, .bg-slate-100, .bg-white\\/95, .bg-white\\/90, .bg-white\\/50 {
+        background-color: rgba(15, 23, 42, 0.65) !important; 
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        backdrop-filter: blur(8px) !important;
+    }
+
+    /* Excepción: Los modales/popups deben ser sólidos para leer bien */
+    .fixed.z-\\[100\\] .bg-white, .fixed.z-\\[100\\] .bg-slate-50, .fixed.z-\\[100\\] .bg-slate-100 {
+        background-color: #0f172a !important; /* Azul marino sólido */
+        backdrop-filter: none !important;
+    }
+
+    /* 4. TEXTOS: Invertir colores oscuros a claros */
+    h1, h2, h3, h4, h5, label, p, span {
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Mejora la legibilidad */
+    }
+    .text-slate-800, .text-slate-700 { color: #ffffff !important; font-weight: 600; }
+    .text-slate-600 { color: #e2e8f0 !important; }
+    .text-slate-500, .text-slate-400 { color: #94a3b8 !important; }
+
+    /* 5. CUADROS DE TEXTO (INPUTS): Simétricos, Blancos y Estéticos */
+    .input-field, 
+    input[type="text"], input[type="password"], input[type="email"], 
+    input[type="date"], input[type="time"], input[type="number"], 
+    select, textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important; /* Texto oscuro dentro del input */
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 0.75rem !important; /* Curva perfecta */
+        padding: 0.75rem 1rem !important; /* Simetría: arriba/abajo y lados */
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        outline: none !important;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05) !important;
+        width: 100% !important;
+    }
+    .input-field:focus, input:focus, select:focus, textarea:focus {
+        border-color: #f97316 !important;
+        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2) !important;
+    }
+    /* Estética del texto de fondo en los inputs */
+    .input-field::placeholder, input::placeholder, textarea::placeholder {
+        color: #94a3b8 !important;
+        font-weight: 400 !important;
+        text-shadow: none !important;
+    }
+
+    /* 6. TARJETAS KANBAN */
+    .kanban-card { 
+        background-color: rgba(30, 41, 59, 0.85) !important; /* Tarjeta un poco más clara que el fondo */
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 1rem !important;
+        color: #ffffff !important;
+        transition: transform 0.2s, box-shadow 0.2s; 
+        cursor: grab; 
+    }
+    .kanban-card:active { 
+        transform: scale(1.02); 
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); 
+    }
+
+    /* 7. BOTONES BURBUJA (Para Login) */
+    .btn-bubble-container {
+        display: flex;
+        background-color: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+        padding: 0.35rem;
+        margin: 0 auto 1.5rem auto;
+        width: fit-content;
+    }
+    .btn-bubble {
+        padding: 0.5rem 1.5rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-bubble-inactive {
+        background-color: transparent !important;
+        color: #94a3b8 !important;
+    }
+    .btn-bubble-active {
+        background-color: #ea580c !important; /* Color Naranja */
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4) !important;
+    }
+
+    /* 8. SCROLLBAR */
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    .app-background { background-image: url('${BACKGROUND_IMAGE}'); background-size: cover; background-position: center; background-repeat: no-repeat; }
-    .app-overlay { background-color: rgba(255, 255, 255, 0.60); backdrop-filter: blur(1px); }
-    .kanban-column { transition: background-color 0.2s; }
-    .kanban-card { transition: transform 0.2s, box-shadow 0.2s; cursor: grab; }
-    .kanban-card:active { cursor: grabbing; transform: scale(1.02); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    
     .leaflet-container { font-family: 'Inter', sans-serif; z-index: 0; }
     .animate-in { animation: fadeIn 0.3s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -1147,9 +1255,12 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
                     <div className="space-y-4"><input type="password" placeholder="Nueva Contraseña" className="input-field" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={handleAdminSetup} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button></div>
                 ) : (
                     <div className="space-y-5">
-                        <div className="flex bg-slate-100 p-1.5 rounded-xl"><button onClick={() => { setRole('admin'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${role === 'admin' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-400'}`}>Admin</button><button onClick={() => { setRole('tech'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${role === 'tech' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-400'}`}>Técnico</button></div>
-                        {role === 'tech' && (<div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Briefcase className="h-5 w-5 text-slate-400" /></div><select className="w-full pl-10 pr-3 py-3 border-none bg-slate-50 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-orange-100 outline-none" value={selectedTechName} onChange={(e) => setSelectedTechName(e.target.value)}><option value="">Selecciona tu usuario...</option>{sortedTecnicos.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}</select></div>)}
-                        <div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-slate-400" /></div><input type="password" placeholder="Contraseña" className="w-full pl-10 py-3 bg-slate-50 rounded-xl border-none focus:ring-2 focus:ring-orange-100 outline-none" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                        <div className="btn-bubble-container">
+                            <button onClick={() => { setRole('admin'); setError(''); }} className={`btn-bubble ${role === 'admin' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Admin</button>
+                            <button onClick={() => { setRole('tech'); setError(''); }} className={`btn-bubble ${role === 'tech' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Técnico</button>
+                        </div>
+                        {role === 'tech' && (<div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Briefcase className="h-5 w-5 text-slate-400" /></div><select className="input-field pl-10" value={selectedTechName} onChange={(e) => setSelectedTechName(e.target.value)}><option value="">Selecciona tu usuario...</option>{sortedTecnicos.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}</select></div>)}
+                        <div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-slate-400" /></div><input type="password" placeholder="Contraseña" className="input-field pl-10" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
                         {error && <p className="text-rose-500 text-sm text-center font-medium bg-rose-50 py-2 rounded-lg">{error}</p>}
                         <button onClick={handleLogin} className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-all">Ingresar</button>
                     </div>

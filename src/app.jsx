@@ -647,7 +647,9 @@ const KPIs = ({ services }) => {
     const [kpiMonth, setKpiMonth] = useState('all');
 
     const filteredServices = services.filter(s => { 
+        if (!s.fInicio) return false;
         const sDate = new Date(s.fInicio); 
+        if (isNaN(sDate.getTime())) return false;
         return (kpiYear === 'all' || sDate.getFullYear().toString() === kpiYear) && (kpiMonth === 'all' || sDate.getMonth().toString() === kpiMonth); 
     });
     
@@ -666,63 +668,99 @@ const KPIs = ({ services }) => {
     const cancelledCount = servicesForCalc.filter(s => s.estado === 'No Finalizado').length;
     const cancellationRate = totalServices ? ((cancelledCount / totalServices) * 100).toFixed(1) : 0;
 
-    let ownFleetUses = 0; let totalVehicleUses = 0;
-    servicesForCalc.forEach(s => { (s.vehiculos || []).forEach(v => { totalVehicleUses++; if (FLOTA_PROPIA.includes(v)) ownFleetUses++; }); });
-    const ownFleetRate = totalVehicleUses ? ((ownFleetUses / totalVehicleUses) * 100).toFixed(0) : 0;
+    let totalVehicleUses = 0;
+    const servicesWithVehicles = servicesForCalc.filter(s => {
+        const vehs = Array.isArray(s.vehiculos) ? s.vehiculos : [];
+        if(vehs.length > 0) {
+            totalVehicleUses += vehs.length;
+            return true;
+        }
+        return false;
+    }).length;
+    const vehicleUsageRate = totalServices ? ((servicesWithVehicles / totalServices) * 100).toFixed(0) : 0;
 
-    const clientMap = {}; servicesForCalc.forEach(s => { clientMap[s.cliente] = (clientMap[s.cliente] || 0) + 1; });
+    const clientMap = {}; 
+    servicesForCalc.forEach(s => { 
+        const cli = String(s.cliente || 'Desconocido');
+        clientMap[cli] = (clientMap[cli] || 0) + 1; 
+    });
     const dataTopClients = Object.entries(clientMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 5);
 
-    const techLoadMap = {}; servicesForCalc.forEach(s => (s.tecnicos || []).forEach(t => { techLoadMap[t] = (techLoadMap[t] || 0) + 1; }));
+    const techLoadMap = {}; 
+    servicesForCalc.forEach(s => { 
+        const techs = Array.isArray(s.tecnicos) ? s.tecnicos : [];
+        techs.forEach(t => { 
+            const tName = String(t);
+            techLoadMap[tName] = (techLoadMap[tName] || 0) + 1; 
+        }); 
+    });
     const dataTechLoad = Object.entries(techLoadMap).map(([name, value]) => ({ name, value })).sort((a,b)=>b.value-a.value).slice(0,10);
 
     let totalWorkHours = 0;
     let totalTravelHours = 0;
     servicesForCalc.forEach(s => {
-        if(s.dailyLogs) {
-            s.dailyLogs.forEach(log => {
-                const start = new Date(`2000-01-01T${log.start}`);
-                const end = new Date(`2000-01-01T${log.end}`);
-                let hours = (end - start) / (1000 * 60 * 60);
-                if (hours < 0) hours += 24;
-                const techCount = (log.workers && log.workers.length > 0) ? log.workers.length : 1;
-                const total = hours * techCount;
-                if (total > 0) {
-                    if (log.type === 'Viaje') totalTravelHours += total;
-                    else totalWorkHours += total;
-                }
-            });
-        }
+        const logs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
+        logs.forEach(log => {
+            if (!log.start || !log.end) return;
+            const start = new Date(`2000-01-01T${log.start}`);
+            const end = new Date(`2000-01-01T${log.end}`);
+            if (isNaN(start) || isNaN(end)) return;
+
+            let hours = (end - start) / (1000 * 60 * 60);
+            if (hours < 0) hours += 24;
+            const workerList = Array.isArray(log.workers) ? log.workers : [];
+            const techCount = workerList.length > 0 ? workerList.length : 1;
+            const total = hours * techCount;
+            if (total > 0 && !isNaN(total)) {
+                if (log.type === 'Viaje') totalTravelHours += total;
+                else totalWorkHours += total;
+            }
+        });
     });
-    const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) }];
+    const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) || 0 }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) || 0 }];
 
     const leadTimeByMonth = {};
     const servicesByMonth = {}; 
 
     servicesForCalc.forEach(s => {
         if (s.fSolicitud && s.fInicio) {
-            const d = new Date(s.fInicio);
-            const m = d.toLocaleString('default', { month: 'short' });
-            const lead = Math.max(0, (new Date(s.fInicio) - new Date(s.fSolicitud)) / (1000 * 3600 * 24));
-            if (!leadTimeByMonth[m]) leadTimeByMonth[m] = { total: 0, count: 0 };
-            leadTimeByMonth[m].total += lead;
-            leadTimeByMonth[m].count += 1;
-            servicesByMonth[m] = (servicesByMonth[m] || 0) + 1;
+            const dInicio = new Date(s.fInicio);
+            const dSol = new Date(s.fSolicitud);
+            if (!isNaN(dInicio) && !isNaN(dSol)) {
+                const m = dInicio.toLocaleString('default', { month: 'short' });
+                const lead = Math.max(0, (dInicio - dSol) / (1000 * 3600 * 24));
+                if (!leadTimeByMonth[m]) leadTimeByMonth[m] = { total: 0, count: 0 };
+                leadTimeByMonth[m].total += lead;
+                leadTimeByMonth[m].count += 1;
+                servicesByMonth[m] = (servicesByMonth[m] || 0) + 1;
+            }
         }
     });
     const dataLeadTimeTrend = Object.entries(leadTimeByMonth).map(([name, data]) => ({
-        name, avg: parseFloat((data.total / data.count).toFixed(1))
+        name, avg: parseFloat((data.total / data.count).toFixed(1)) || 0
     }));
     const dataMonthlyVolume = Object.entries(servicesByMonth).map(([name, value]) => ({ name, value }));
 
     let totalServiceDuration = 0;
+    let validDurationCount = 0;
     servicesForCalc.forEach(s => {
-        totalServiceDuration += (new Date(s.fFin) - new Date(s.fInicio)) / (1000 * 3600 * 24) + 1;
+        if (s.fInicio && s.fFin) {
+            const dInicio = new Date(s.fInicio);
+            const dFin = new Date(s.fFin);
+            if (!isNaN(dInicio) && !isNaN(dFin)) {
+                const dur = (dFin - dInicio) / (1000 * 3600 * 24) + 1;
+                totalServiceDuration += dur;
+                validDurationCount++;
+            }
+        }
     });
-    const avgDuration = totalServices ? (totalServiceDuration / totalServices).toFixed(1) : 0;
+    const avgDuration = validDurationCount ? (totalServiceDuration / validDurationCount).toFixed(1) : 0;
 
     const servicesByTypeMap = {};
-    servicesForCalc.forEach(s => { servicesByTypeMap[s.tipoTrabajo] = (servicesByTypeMap[s.tipoTrabajo] || 0) + 1; });
+    servicesForCalc.forEach(s => { 
+        const tipo = String(s.tipoTrabajo || 'Desconocido');
+        servicesByTypeMap[tipo] = (servicesByTypeMap[tipo] || 0) + 1; 
+    });
     const dataServicesByType = Object.entries(servicesByTypeMap).map(([name, value]) => ({ name, value }));
 
     return (

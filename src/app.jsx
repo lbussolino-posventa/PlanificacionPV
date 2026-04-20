@@ -495,7 +495,11 @@ const MapDashboard = ({ services }) => {
 
                 PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
 
-                const finishedServices = services.filter(s => s.estado === 'Finalizado' && s.ubicacion);
+                const finishedServices = services.filter(s => 
+                    s.estado === 'Finalizado' && 
+                    s.ubicacion && 
+                    (s.tipoTrabajo === "Montaje de Transformador" || s.tipoTrabajo === "Supervisión de Montaje")
+                );
                 for (const s of finishedServices) {
                     if (!isMounted) break;
                     const addrKey = s.ubicacion.trim().toLowerCase();
@@ -1443,7 +1447,10 @@ export default function App() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (formData.tipoTrabajo.includes('Montaje') && !formData.ubicacion) { showNotification("La ubicación es obligatoria para trabajos de Montaje.", "error"); return; }
+        if ((formData.tipoTrabajo === "Montaje de Transformador" || formData.tipoTrabajo === "Supervisión de Montaje") && !formData.ubicacion) {
+            showNotification("La ubicación es obligatoria para trabajos de Montaje o Supervisión.", "error");
+            return;
+        }
         const serviceData = { 
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,

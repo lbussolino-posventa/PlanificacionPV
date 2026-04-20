@@ -644,21 +644,31 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
         return base.filter(s => s.estado !== 'Finalizado');
     }, [services, maintenanceRecords, mode]);
 
-    if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros pendientes para mostrar en el calendario.</div>;
+    // --- LÓGICA DE FECHAS CORREGIDA ---
+    const today = new Date(); 
+    today.setHours(0,0,0,0);
+
+    // Forzamos que el inicio del calendario sea SIEMPRE hoy
+    const minDate = new Date(today); 
     
-    const dates = visibleServices.flatMap(s => [new Date(s.fInicio), new Date(s.fFin)]).filter(d => !isNaN(d.getTime()));
-    const today = new Date(); today.setHours(0,0,0,0);
-    if(dates.length === 0) dates.push(today);
+    // El máximo será 60 días desde hoy para dar perspectiva, o la fecha más lejana de los servicios
+    const serviceDates = visibleServices.flatMap(s => [new Date(s.fFin)]).filter(d => !isNaN(d.getTime()));
+    const maxServiceDate = serviceDates.length > 0 ? new Date(Math.max(...serviceDates)) : new Date(today);
     
-    const minDate = new Date(Math.min(...dates, today.getTime())); minDate.setDate(minDate.getDate() - 3);
-    const maxDate = new Date(Math.max(...dates, today.getTime())); maxDate.setDate(maxDate.getDate() + 30);
-    
+    const maxDate = new Date(maxServiceDate);
+    maxDate.setDate(maxDate.getDate() + 15); // Margen de 15 días extra al final
+
     const DAY_WIDTH = 50; 
-    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1); 
+    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); // Mínimo 30 días de vista
     const chartWidth = totalDays * DAY_WIDTH;
 
-    const sortedVisibleServices = [...visibleServices].sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    // Filtrar servicios que terminan antes de hoy para no ensuciar la vista
+    const sortedVisibleServices = [...visibleServices]
+        .filter(s => new Date(s.fFin) >= minDate)
+        .sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
 
+    if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros pendientes para mostrar en el calendario.</div>;
+    
     return (
         <div className="bg-white/90 rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden backdrop-blur-sm relative flex flex-col h-[calc(100vh-200px)]">
            {selectedGanttService && (
@@ -676,16 +686,7 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                       <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Responsable:' : 'Equipo:'}</span> {selectedGanttService.tecnicos?.join(', ')}</span></div>
                       <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Fecha Prog.:' : 'Ejecución:'}</span> {formatDate(selectedGanttService.fInicio)} {!selectedGanttService.esMantenimiento && `al ${formatDate(selectedGanttService.fFin)}`}</span></div>
                       
-                      {!selectedGanttService.esMantenimiento && selectedGanttService.tipoTrabajo !== 'Vacaciones' && selectedGanttService.tipoTrabajo !== 'Estudios Médicos' && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
-                              <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
-                          </div>
-                      )}
-                      {selectedGanttService.esMantenimiento && selectedGanttService.observaciones && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2"><span className="font-bold block mb-1">Detalle:</span> {selectedGanttService.observaciones}</div>
-                      )}
+                      {selectedGanttService.estado === 'En Servicio' && <div className="animate-pulse flex items-center text-blue-600 font-bold bg-blue-50 p-2 rounded-lg"><Activity className="w-3 h-3 mr-2"/> TRABAJO EN CURSO</div>}
 
                       <div className="flex items-center mt-2">
                           <span className={`px-2 py-1 rounded text-[10px] font-bold border w-full text-center ${selectedGanttService.estado==='Finalizado'||selectedGanttService.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':selectedGanttService.estado==='En Servicio'||selectedGanttService.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':selectedGanttService.estado==='No Finalizado'?'bg-rose-50 border-rose-200 text-rose-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>
@@ -701,7 +702,7 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                   {Array.from({ length: Math.ceil(totalDays) }).map((_, i) => {
                     const d = new Date(minDate); d.setDate(d.getDate() + i);
                     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const isToday = d.toDateString() === new Date().toDateString();
+                    const isToday = d.toDateString() === today.toDateString();
                     return (
                         <div key={i} className={`flex-shrink-0 border-l border-slate-100 flex flex-col justify-center items-center ${isWeekend ? 'bg-slate-50' : ''} ${isToday ? 'bg-orange-50 border-orange-200' : ''}`} style={{ width: `${DAY_WIDTH}px` }}>
                             <span className={`text-[10px] uppercase ${isToday ? 'text-orange-500 font-bold' : 'text-slate-300'}`}>{d.toLocaleString('es-ES', { weekday: 'short' })}</span><span className={`font-bold ${isToday ? 'text-orange-600' : 'text-slate-700'}`}>{d.getDate()}/{d.getMonth()+1}</span>
@@ -712,10 +713,14 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                <div className="pt-2">
                    {sortedVisibleServices.map((srv, idx) => {
                      const start = new Date(srv.fInicio);
-                     if (new Date(srv.fFin) < minDate) return null; 
-
-                     let offsetDays = (start - minDate) / (1000 * 60 * 60 * 24);
-                     const duration = (new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24) + 1;
+                     const end = new Date(srv.fFin);
+                     
+                     // Ajustar visualmente si la tarea empezó antes de hoy pero termina después
+                     const effectiveStart = start < minDate ? minDate : start;
+                     
+                     let offsetDays = (effectiveStart - minDate) / (1000 * 60 * 60 * 24);
+                     const duration = (end - effectiveStart) / (1000 * 60 * 60 * 24) + 1;
+                     
                      const leftPos = offsetDays * DAY_WIDTH;
                      const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH); 
                      
@@ -743,7 +748,12 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                      );
                    })}
                </div>
-               <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">{Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (<div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>))}</div>
+               {/* Línea de hoy */}
+               <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">
+                  {Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (
+                    <div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>
+                  ))}
+               </div>
              </div>
            </div>
         </div>

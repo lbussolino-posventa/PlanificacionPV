@@ -289,7 +289,7 @@ const GlobalStyles = () => (
     input[type="date"], input[type="time"], input[type="number"], 
     select, textarea {
         background-color: #ffffff !important;
-        color: #0f172a !important; /* Texto oscuro dentro del input */
+        color: #b34505ce !important; /* Texto oscuro dentro del input */
         border: 1px solid #cbd5e1 !important;
         border-radius: 0.75rem !important; /* Curva perfecta */
         padding: 0.75rem 1rem !important; /* Simetría: arriba/abajo y lados */

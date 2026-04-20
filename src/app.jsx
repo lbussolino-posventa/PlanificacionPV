@@ -621,131 +621,111 @@ const KanbanBoard = ({ services, maintenanceRecords, onStatusChange, onMaintenan
     );
 };
 
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Edit2 } from 'lucide-react';
+
 const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', handleEdit, isAdmin }) => {
     const [selectedGanttService, setSelectedGanttService] = useState(null);
-    
+    const scrollRef = useRef(null);
+
     const visibleServices = useMemo(() => {
-        let base = services || []; 
-        if (mode === 'operations') { return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos'); } 
-        else if (mode === 'vacations') { return base.filter(s => s.estado !== 'Finalizado' && (s.tipoTrabajo === 'Vacaciones' || s.tipoTrabajo === 'Estudios Médicos')); }
+        let base = services || [];
+        if (mode === 'operations') {
+            return base.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
+        } 
         else if (mode === 'fleet') {
-            return (maintenanceRecords||[]).filter(m => m.estado !== 'Realizado').map(m => ({
+            return (maintenanceRecords || []).filter(m => m.estado !== 'Realizado').map(m => ({
                 ...m, fInicio: m.fecha, fFin: m.fecha, cliente: m.vehiculo, tipoTrabajo: m.tipo, estado: m.estado,
-                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno'], esMantenimiento: true
+                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo'], esMantenimiento: true
             }));
-        } else if (mode === 'mixed') {
-            const activeServices = base.filter(s => s.estado !== 'Finalizado');
-            const activeMaintenance = (maintenanceRecords||[]).filter(m => m.estado !== 'Realizado').map(m => ({
-                ...m, fInicio: m.fecha, fFin: m.fecha, cliente: m.vehiculo, tipoTrabajo: m.tipo, estado: m.estado,
-                oci: m.km ? `${m.km} km` : 'MANT', tecnicos: m.tecnicoAsignado ? [m.tecnicoAsignado] : ['Taller Externo / Ninguno'], esMantenimiento: true
-            }));
-            return [...activeServices, ...activeMaintenance];
         }
         return base.filter(s => s.estado !== 'Finalizado');
     }, [services, maintenanceRecords, mode]);
 
-    if (visibleServices.length === 0) return <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">No hay registros pendientes para mostrar en el calendario.</div>;
-    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Ajustamos minDate para que hoy sea el inicio real
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() - 1); 
+
     const dates = visibleServices.flatMap(s => [new Date(s.fInicio), new Date(s.fFin)]).filter(d => !isNaN(d.getTime()));
-    const today = new Date(); today.setHours(0,0,0,0);
-    if(dates.length === 0) dates.push(today);
+    const maxDate = new Date(Math.max(...dates, today.getTime() + (30 * 24 * 60 * 60 * 1000))); 
     
-    const minDate = new Date(Math.min(...dates, today.getTime())); minDate.setDate(minDate.getDate() - 3);
-    const maxDate = new Date(Math.max(...dates, today.getTime())); maxDate.setDate(maxDate.getDate() + 30);
-    
-    const DAY_WIDTH = 50; 
-    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1); 
+    const DAY_WIDTH = 60; // Un poco más ancho para mejor lectura
+    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 1);
     const chartWidth = totalDays * DAY_WIDTH;
 
-    const sortedVisibleServices = [...visibleServices].sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    useEffect(() => {
+        if (scrollRef.current) {
+            const daysFromStart = (today - minDate) / (1000 * 60 * 60 * 24);
+            scrollRef.current.scrollLeft = daysFromStart * DAY_WIDTH;
+        }
+    }, [visibleServices, mode]);
 
     return (
-        <div className="bg-white/90 rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden backdrop-blur-sm relative flex flex-col h-[calc(100vh-200px)]">
-           {selectedGanttService && (
-              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-[100] w-80 animate-in zoom-in-95 duration-200">
-                  <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-50">
-                      <div>
-                          <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">{selectedGanttService.tipoTrabajo === 'Otro' && selectedGanttService.tipoTrabajoOtro ? `Otro: ${selectedGanttService.tipoTrabajoOtro}` : selectedGanttService.tipoTrabajo}</h4>
-                          <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{selectedGanttService.oci}</span>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedGanttService(null); }} className="p-1 hover:bg-rose-50 rounded-full text-slate-400 hover:text-rose-500 transition-colors"><X className="w-5 h-5"/></button>
-                  </div>
-                  <div className="text-xs text-slate-600 space-y-2.5">
-                      {!selectedGanttService.esMantenimiento && <div className="flex items-start"><CalendarPlus className="w-4 h-4 mr-2 text-orange-500 shrink-0"/> <span><span className="font-bold">Solicitado el:</span> {formatDate(selectedGanttService.fSolicitud)}</span></div>}
-                      <div className="flex items-start"><Briefcase className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Vehículo:' : 'Cliente:'}</span> {selectedGanttService.cliente}</span></div>
-                      <div className="flex items-start"><Users className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Responsable:' : 'Equipo:'}</span> {selectedGanttService.tecnicos?.join(', ')}</span></div>
-                      <div className="flex items-start"><Calendar className="w-4 h-4 mr-2 text-indigo-500 shrink-0"/> <span><span className="font-bold">{selectedGanttService.esMantenimiento ? 'Fecha Prog.:' : 'Ejecución:'}</span> {formatDate(selectedGanttService.fInicio)} {!selectedGanttService.esMantenimiento && `al ${formatDate(selectedGanttService.fFin)}`}</span></div>
-                      
-                      {!selectedGanttService.esMantenimiento && selectedGanttService.tipoTrabajo !== 'Vacaciones' && selectedGanttService.tipoTrabajo !== 'Estudios Médicos' && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-2 mt-2">
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Potencia</span><span className="font-bold text-slate-700">{selectedGanttService.trafoPotencia || '-'}</span></div>
-                              <div><span className="text-[9px] text-slate-400 font-bold block uppercase">Relación</span><span className="font-bold text-slate-700">{selectedGanttService.trafoRelacion || '-'}</span></div>
-                              <div className="col-span-2"><span className="text-[9px] text-slate-400 font-bold block uppercase">Serie</span><span className="font-mono text-slate-700">{selectedGanttService.trafoSerie || '-'}</span></div>
-                          </div>
-                      )}
-                      {selectedGanttService.esMantenimiento && selectedGanttService.observaciones && (
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2"><span className="font-bold block mb-1">Detalle:</span> {selectedGanttService.observaciones}</div>
-                      )}
+        <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-700 p-4 overflow-hidden relative flex flex-col h-[calc(100vh-220px)]">
+            
+            {/* Pop-over de Detalles Corregido (Z-INDEX ALTO) */}
+            {selectedGanttService && (
+                <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-orange-500/30 z-[9999] w-80 animate-in zoom-in-95 text-white">
+                    <div className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
+                        <h4 className="font-black text-orange-500 text-sm uppercase">{selectedGanttService.cliente}</h4>
+                        <button onClick={() => setSelectedGanttService(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                    </div>
+                    <div className="text-xs space-y-3">
+                        <p><span className="text-slate-400">Tarea:</span> {selectedGanttService.tipoTrabajo}</p>
+                        <p><span className="text-slate-400">OCI/Ref:</span> {selectedGanttService.oci}</p>
+                        <p><span className="text-slate-400">Inicio:</span> {new Date(selectedGanttService.fInicio).toLocaleDateString()}</p>
+                        <p><span className="text-slate-400">Fin:</span> {new Date(selectedGanttService.fFin).toLocaleDateString()}</p>
+                    </div>
+                </div>
+            )}
 
-                      <div className="flex items-center mt-2">
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold border w-full text-center ${selectedGanttService.estado==='Finalizado'||selectedGanttService.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':selectedGanttService.estado==='En Servicio'||selectedGanttService.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':selectedGanttService.estado==='No Finalizado'?'bg-rose-50 border-rose-200 text-rose-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                              {selectedGanttService.postergado ? 'POSTERGADO' : selectedGanttService.estado}
-                          </span>
-                      </div>
-                  </div>
-              </div>
-           )}
-           <div className="overflow-auto custom-scrollbar flex-1 relative border rounded-xl border-slate-100">
-             <div className="relative" style={{ minWidth: `${chartWidth + 200}px`, height: '100%' }}>
-               <div className="sticky top-0 left-0 z-20 bg-white border-b border-slate-200 h-12 flex text-xs font-semibold text-slate-500 shadow-sm pl-48">
-                  {Array.from({ length: Math.ceil(totalDays) }).map((_, i) => {
-                    const d = new Date(minDate); d.setDate(d.getDate() + i);
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const isToday = d.toDateString() === new Date().toDateString();
-                    return (
-                        <div key={i} className={`flex-shrink-0 border-l border-slate-100 flex flex-col justify-center items-center ${isWeekend ? 'bg-slate-50' : ''} ${isToday ? 'bg-orange-50 border-orange-200' : ''}`} style={{ width: `${DAY_WIDTH}px` }}>
-                            <span className={`text-[10px] uppercase ${isToday ? 'text-orange-500 font-bold' : 'text-slate-300'}`}>{d.toLocaleString('es-ES', { weekday: 'short' })}</span><span className={`font-bold ${isToday ? 'text-orange-600' : 'text-slate-700'}`}>{d.getDate()}/{d.getMonth()+1}</span>
-                        </div>
-                    );
-                  })}
-               </div>
-               <div className="pt-2">
-                   {sortedVisibleServices.map((srv, idx) => {
-                     const start = new Date(srv.fInicio);
-                     if (new Date(srv.fFin) < minDate) return null; 
+            <div ref={scrollRef} className="overflow-auto custom-scrollbar flex-1 relative rounded-xl">
+                <div className="relative" style={{ width: `${chartWidth + 250}px` }}>
+                    
+                    {/* Header de Fechas */}
+                    <div className="sticky top-0 z-30 flex h-12 bg-slate-900/95 backdrop-blur-md border-b border-slate-700">
+                        <div className="sticky left-0 z-40 w-48 bg-slate-900 border-r border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-500 uppercase">Clientes / Equipos</div>
+                        {Array.from({ length: Math.ceil(totalDays) }).map((_, i) => {
+                            const d = new Date(minDate); d.setDate(d.getDate() + i);
+                            const isToday = d.toDateString() === today.toDateString();
+                            return (
+                                <div key={i} style={{ width: `${DAY_WIDTH}px` }} className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-800 ${isToday ? 'bg-orange-500/10' : ''}`}>
+                                    <span className={`text-[9px] ${isToday ? 'text-orange-500 font-bold' : 'text-slate-500'}`}>{d.toLocaleString('es-ES', { weekday: 'short' })}</span>
+                                    <span className={`text-xs ${isToday ? 'text-orange-400 font-black' : 'text-slate-300'}`}>{d.getDate()}/{d.getMonth()+1}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
 
-                     let offsetDays = (start - minDate) / (1000 * 60 * 60 * 24);
-                     const duration = (new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24) + 1;
-                     const leftPos = offsetDays * DAY_WIDTH;
-                     const width = Math.max(duration * DAY_WIDTH, DAY_WIDTH); 
-                     
-                     let colorClass = 'bg-orange-500 shadow-orange-200';
-                     if (srv.esMantenimiento) {
-                         colorClass = srv.estado === 'Realizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'En Taller' ? 'bg-blue-500 shadow-blue-200' : 'bg-indigo-500 shadow-indigo-200';
-                     } else {
-                         colorClass = (srv.tipoTrabajo === 'Vacaciones' || srv.tipoTrabajo === 'Estudios Médicos') ? 'bg-sky-400 shadow-sky-200' : srv.estado === 'Finalizado' ? 'bg-emerald-500 shadow-emerald-200' : srv.estado === 'No Finalizado' ? 'bg-slate-700 shadow-slate-300' : srv.estado === 'En Servicio' ? 'bg-blue-500 shadow-blue-200' : srv.postergado ? 'bg-rose-500 shadow-rose-200' : 'bg-orange-500 shadow-orange-200';
-                     }
-
-                     return (
-                       <div key={srv.id} className="flex items-center group hover:bg-slate-50 transition-colors h-14 border-b border-slate-50/50">
-                         <div className="sticky left-0 z-10 w-48 pl-4 pr-4 bg-white/95 backdrop-blur-sm border-r border-slate-100 h-full flex items-center justify-end shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
-                             <span className="text-xs font-bold text-slate-600 truncate text-right w-full" title={srv.cliente}>{srv.tipoTrabajo === 'Vacaciones' ? (srv.tecnicos?.[0] || 'N/A') : srv.cliente}</span>
-                         </div>
-                         <div className="relative h-full flex-1">
-                             <div onClick={() => setSelectedGanttService(srv)} className={`absolute h-8 top-3 rounded-lg shadow-md flex items-center px-3 text-xs text-white font-medium cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg ${colorClass} overflow-hidden whitespace-nowrap`} style={{ left: `${leftPos}px`, width: `${width - 4}px` }}>
-                                 <span className="truncate drop-shadow-md">
-                                     {srv.tipoTrabajo === 'Vacaciones' ? srv.tipoTrabajo : srv.esMantenimiento ? `${srv.cliente} - ${srv.tipoTrabajo}` : `${srv.oci} - ${srv.tipoTrabajo === 'Otro' && srv.tipoTrabajoOtro ? srv.tipoTrabajoOtro : srv.tipoTrabajo}`}
-                                 </span>
-                             </div>
-                         </div>
-                         {isAdmin && <div className="sticky right-0 z-10 w-10 bg-white/50 h-full flex items-center justify-center"><button onClick={() => handleEdit(srv)} className="p-1.5 hover:bg-orange-50 rounded-full text-slate-300 hover:text-orange-600 transition-colors"><Edit2 className="w-3.5 h-3.5"/></button></div>}
-                       </div>
-                     );
-                   })}
-               </div>
-               <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">{Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (<div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>))}</div>
-             </div>
-           </div>
+                    {/* Filas */}
+                    {visibleServices.map((srv) => {
+                        const start = new Date(srv.fInicio);
+                        const offsetDays = (start - minDate) / (1000 * 60 * 60 * 24);
+                        const duration = Math.max(((new Date(srv.fFin) - start) / (1000 * 60 * 60 * 24)) + 1, 1);
+                        
+                        return (
+                            <div key={srv.id} className="flex h-12 border-b border-slate-800/50 group hover:bg-slate-800/30">
+                                <div className="sticky left-0 z-20 w-48 bg-slate-900/95 border-r border-slate-700 px-4 flex items-center text-[11px] font-medium text-slate-300 truncate">
+                                    {srv.cliente}
+                                </div>
+                                <div className="relative flex-1">
+                                    <div 
+                                        onClick={() => setSelectedGanttService(srv)}
+                                        className={`absolute top-2 h-8 rounded-md px-2 flex items-center text-[10px] font-bold text-white cursor-pointer transition-all hover:scale-[1.02] z-10 
+                                            ${srv.estado === 'En Servicio' ? 'bg-blue-600 shadow-blue-900/20' : 'bg-orange-600 shadow-orange-900/20'}`}
+                                        style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${duration * DAY_WIDTH - 4}px` }}
+                                    >
+                                        <span className="truncate">{srv.oci} - {srv.tipoTrabajo}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 };

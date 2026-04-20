@@ -782,9 +782,10 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
     );
 };
 
-const KPIs = ({ services }) => {
+const KPIs = ({ services, maintenanceRecords = [] }) => {
     const [kpiYear, setKpiYear] = useState('all');
     const [kpiMonth, setKpiMonth] = useState('all');
+    const [selectedVehicleKpi, setSelectedVehicleKpi] = useState('');
 
     const filteredServices = services.filter(s => { 
         if (!s.fInicio) return false;
@@ -795,6 +796,121 @@ const KPIs = ({ services }) => {
     
     const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
 
+    // Extraer meses para ordenarlos de forma cronológica (formato interno YYYY-MM)
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const formatMonthKey = (dateObj) => {
+        if(isNaN(dateObj)) return null;
+        return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+    };
+    const formatMonthLabel = (mKey) => {
+        if(!mKey) return '';
+        const [y, m] = mKey.split('-');
+        return `${monthNames[parseInt(m, 10)-1]} ${y.slice(2)}`;
+    };
+
+    const leadTimeByMonth = {};
+    const servicesByMonth = {}; 
+    const hoursByMonth = {};
+
+    let totalWorkHours = 0;
+    let totalTravelHours = 0;
+
+    servicesForCalc.forEach(s => {
+        // Tiempos de Respuesta y Volumen Mensual (Orden cronológico YYYY-MM)
+        if (s.fInicio) {
+            const dInicio = new Date(s.fInicio);
+            const mKey = formatMonthKey(dInicio);
+            if (mKey) {
+                servicesByMonth[mKey] = (servicesByMonth[mKey] || 0) + 1;
+                
+                if (s.fSolicitud) {
+                    const dSol = new Date(s.fSolicitud);
+                    if (!isNaN(dSol)) {
+                        const lead = Math.max(0, (dInicio - dSol) / (1000 * 3600 * 24));
+                        if (!leadTimeByMonth[mKey]) leadTimeByMonth[mKey] = { total: 0, count: 0 };
+                        leadTimeByMonth[mKey].total += lead;
+                        leadTimeByMonth[mKey].count += 1;
+                    }
+                }
+            }
+        }
+
+        // Horas Trabajadas (Distribución Horaria y por mes)
+        const logs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
+        logs.forEach(log => {
+            if (!log.start || !log.end || !log.date) return;
+            const logDate = new Date(log.date);
+            const start = new Date(`2000-01-01T${log.start}`);
+            const end = new Date(`2000-01-01T${log.end}`);
+            if (isNaN(start) || isNaN(end) || isNaN(logDate)) return;
+
+            let hours = (end - start) / (1000 * 60 * 60);
+            if (hours < 0) hours += 24;
+            const workerList = Array.isArray(log.workers) ? log.workers : [];
+            const techCount = workerList.length > 0 ? workerList.length : 1;
+            const total = hours * techCount;
+            
+            if (total > 0 && !isNaN(total)) {
+                if (log.type === 'Viaje') totalTravelHours += total;
+                else totalWorkHours += total;
+
+                const mKeyLog = formatMonthKey(logDate);
+                if(mKeyLog) {
+                    hoursByMonth[mKeyLog] = (hoursByMonth[mKeyLog] || 0) + total;
+                }
+            }
+        });
+    });
+
+    const dataLeadTimeTrend = Object.keys(leadTimeByMonth).sort().map(k => ({
+        name: formatMonthLabel(k),
+        avg: parseFloat((leadTimeByMonth[k].total / leadTimeByMonth[k].count).toFixed(1)) || 0
+    }));
+
+    const dataMonthlyVolume = Object.keys(servicesByMonth).sort().map(k => ({
+        name: formatMonthLabel(k),
+        value: servicesByMonth[k]
+    }));
+
+    const dataHoursByMonth = Object.keys(hoursByMonth).sort().map(k => ({
+        name: formatMonthLabel(k),
+        horas: parseFloat(hoursByMonth[k].toFixed(1))
+    }));
+
+    const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) || 0 }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) || 0 }];
+
+    // Velocímetro (Kilometraje de vehículos)
+    const vehicleMaxKm = {};
+    (maintenanceRecords || []).forEach(m => {
+        if (m.vehiculo && m.km) {
+            const vLow = m.vehiculo.toLowerCase();
+            // Filtro para excluir aéreos o alquiler
+            if (!vLow.includes('aereo') && !vLow.includes('aéreo') && !vLow.includes('alquiler')) {
+                const km = Number(m.km);
+                if (!isNaN(km)) {
+                    vehicleMaxKm[m.vehiculo] = Math.max(vehicleMaxKm[m.vehiculo] || 0, km);
+                }
+            }
+        }
+    });
+
+    const vehicleNamesList = Object.keys(vehicleMaxKm).sort();
+    useEffect(() => {
+        if (!selectedVehicleKpi && vehicleNamesList.length > 0) {
+            setSelectedVehicleKpi(vehicleNamesList[0]);
+        }
+    }, [vehicleNamesList, selectedVehicleKpi]);
+
+    const safeSelectedVehicle = vehicleNamesList.includes(selectedVehicleKpi) ? selectedVehicleKpi : vehicleNamesList[0];
+    const currentVehKm = vehicleMaxKm[safeSelectedVehicle] || 0;
+    const maxKmLimit = 180000;
+    const isKmExceeded = currentVehKm > maxKmLimit;
+    const gaugePercentage = Math.min(currentVehKm / maxKmLimit, 1) * 100;
+    const gaugeData = [
+        { name: 'Km', value: gaugePercentage, fill: isKmExceeded ? '#ef4444' : '#f97316' },
+        { name: 'Rest', value: 100 - gaugePercentage, fill: '#f1f5f9' }
+    ];
+
     if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
     
     const totalServices = servicesForCalc.length;
@@ -802,22 +918,7 @@ const KPIs = ({ services }) => {
     const successRate = closedServices.length ? ((closedServices.filter(s => s.estado === 'Finalizado').length / closedServices.length) * 100).toFixed(0) : 0;
     const activeServicesCount = servicesForCalc.filter(s => s.estado === 'En Servicio').length;
     const postponedCount = servicesForCalc.filter(s => s.postergado).length;
-    const adherenceRate = totalServices ? (((totalServices - postponedCount) / totalServices) * 100).toFixed(0) : 0;
-    const totalClaims = servicesForCalc.filter(s => s.tipoTrabajo === "Asistencia por reclamo").length;
-    const qualityRate = totalServices ? (((totalServices - totalClaims) / totalServices) * 100).toFixed(1) : 100;
-    const cancelledCount = servicesForCalc.filter(s => s.estado === 'No Finalizado').length;
-    const cancellationRate = totalServices ? ((cancelledCount / totalServices) * 100).toFixed(1) : 0;
-
-    let totalVehicleUses = 0;
-    const servicesWithVehicles = servicesForCalc.filter(s => {
-        const vehs = Array.isArray(s.vehiculos) ? s.vehiculos : [];
-        if(vehs.length > 0) {
-            totalVehicleUses += vehs.length;
-            return true;
-        }
-        return false;
-    }).length;
-    const vehicleUsageRate = totalServices ? ((servicesWithVehicles / totalServices) * 100).toFixed(0) : 0;
+    const qualityRate = totalServices ? (((totalServices - servicesForCalc.filter(s => s.tipoTrabajo === "Asistencia por reclamo").length) / totalServices) * 100).toFixed(1) : 100;
 
     const clientMap = {}; 
     servicesForCalc.forEach(s => { 
@@ -835,66 +936,6 @@ const KPIs = ({ services }) => {
         }); 
     });
     const dataTechLoad = Object.entries(techLoadMap).map(([name, value]) => ({ name, value })).sort((a,b)=>b.value-a.value).slice(0,10);
-
-    let totalWorkHours = 0;
-    let totalTravelHours = 0;
-    servicesForCalc.forEach(s => {
-        const logs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
-        logs.forEach(log => {
-            if (!log.start || !log.end) return;
-            const start = new Date(`2000-01-01T${log.start}`);
-            const end = new Date(`2000-01-01T${log.end}`);
-            if (isNaN(start) || isNaN(end)) return;
-
-            let hours = (end - start) / (1000 * 60 * 60);
-            if (hours < 0) hours += 24;
-            const workerList = Array.isArray(log.workers) ? log.workers : [];
-            const techCount = workerList.length > 0 ? workerList.length : 1;
-            const total = hours * techCount;
-            if (total > 0 && !isNaN(total)) {
-                if (log.type === 'Viaje') totalTravelHours += total;
-                else totalWorkHours += total;
-            }
-        });
-    });
-    const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) || 0 }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) || 0 }];
-
-    const leadTimeByMonth = {};
-    const servicesByMonth = {}; 
-
-    servicesForCalc.forEach(s => {
-        if (s.fSolicitud && s.fInicio) {
-            const dInicio = new Date(s.fInicio);
-            const dSol = new Date(s.fSolicitud);
-            if (!isNaN(dInicio) && !isNaN(dSol)) {
-                const m = dInicio.toLocaleString('default', { month: 'short' });
-                const lead = Math.max(0, (dInicio - dSol) / (1000 * 3600 * 24));
-                if (!leadTimeByMonth[m]) leadTimeByMonth[m] = { total: 0, count: 0 };
-                leadTimeByMonth[m].total += lead;
-                leadTimeByMonth[m].count += 1;
-                servicesByMonth[m] = (servicesByMonth[m] || 0) + 1;
-            }
-        }
-    });
-    const dataLeadTimeTrend = Object.entries(leadTimeByMonth).map(([name, data]) => ({
-        name, avg: parseFloat((data.total / data.count).toFixed(1)) || 0
-    }));
-    const dataMonthlyVolume = Object.entries(servicesByMonth).map(([name, value]) => ({ name, value }));
-
-    let totalServiceDuration = 0;
-    let validDurationCount = 0;
-    servicesForCalc.forEach(s => {
-        if (s.fInicio && s.fFin) {
-            const dInicio = new Date(s.fInicio);
-            const dFin = new Date(s.fFin);
-            if (!isNaN(dInicio) && !isNaN(dFin)) {
-                const dur = (dFin - dInicio) / (1000 * 3600 * 24) + 1;
-                totalServiceDuration += dur;
-                validDurationCount++;
-            }
-        }
-    });
-    const avgDuration = validDurationCount ? (totalServiceDuration / validDurationCount).toFixed(1) : 0;
 
     const servicesByTypeMap = {};
     servicesForCalc.forEach(s => { 
@@ -928,9 +969,53 @@ const KPIs = ({ services }) => {
                 ))}
             </div>
             
+            {/* NUEVOS GRÁFICOS: Velocímetro y Horas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden h-80">
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-bold text-slate-800 text-sm flex items-center"><Activity className="w-4 h-4 mr-2 text-rose-500"/> Estado de Flota (KM)</h4>
+                        <select className="bg-slate-50 border border-slate-200 rounded-lg text-xs py-1 px-2 outline-none max-w-[150px] truncate font-bold text-slate-700" value={selectedVehicleKpi} onChange={e=>setSelectedVehicleKpi(e.target.value)}>
+                            {vehicleNamesList.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                    </div>
+                    <div className="h-full w-full relative">
+                        {vehicleNamesList.length > 0 ? (
+                            <>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={gaugeData} cx="50%" cy="65%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={90} dataKey="value" stroke="none" isAnimationActive={false} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute top-[55%] left-1/2 transform -translate-x-1/2 flex flex-col items-center text-center w-full">
+                                    <span className={`text-4xl font-black ${isKmExceeded ? 'text-rose-500' : 'text-slate-700'}`}>{currentVehKm.toLocaleString()}</span>
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">KM Actuales</span>
+                                    {isKmExceeded && <span className="text-[10px] font-bold text-white bg-rose-500 px-3 py-1 rounded-full mt-2 animate-pulse shadow-md shadow-rose-200">LÍMITE EXCEDIDO</span>}
+                                    {!isKmExceeded && <span className="text-[10px] font-bold text-slate-400 mt-2 bg-slate-50 px-2 py-0.5 rounded">Límite: 180.000 km</span>}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex items-center justify-center h-full pb-10 text-xs text-slate-400 italic">Sin datos de KM registrados o aplicables.</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm h-80">
+                    <h4 className="font-bold text-slate-800 text-sm flex items-center mb-4"><Timer className="w-4 h-4 mr-2 text-indigo-500"/> Horas Trabajadas por Mes</h4>
+                    <ResponsiveContainer width="100%" height="85%">
+                        <RechartsBarChart data={dataHoursByMonth}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:'#94a3b8', fontSize:11, fontWeight: 600}} dy={10}/>
+                            <YAxis axisLine={false} tickLine={false} tick={{fill:'#94a3b8', fontSize:11, fontWeight: 600}}/>
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
+                            <Bar dataKey="horas" name="Horas Hombre" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
+                        </RechartsBarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative col-span-2">
-                    <div className="flex justify-between items-center mb-6"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><Clock className="w-4 h-4 mr-2 text-indigo-500"/> Tiempos de Respuesta (Lead Time)</h4><p className="text-[10px] text-slate-400 font-medium">Promedio de días desde Solicitud hasta Inicio por mes</p></div></div>
+                    <div className="flex justify-between items-center mb-6"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><Clock className="w-4 h-4 mr-2 text-blue-500"/> Tiempos de Respuesta (Lead Time)</h4><p className="text-[10px] text-slate-400 font-medium">Promedio de días desde Solicitud hasta Inicio por mes</p></div></div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <RechartsBarChart data={dataLeadTimeTrend}>
@@ -945,7 +1030,7 @@ const KPIs = ({ services }) => {
                 </div>
 
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
-                    <div className="flex justify-between items-center mb-6 relative z-10"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><Timer className="w-4 h-4 mr-2 text-orange-500"/> Distribución Horaria</h4><p className="text-[10px] text-slate-400 font-medium">Horas Hombre (Productivas vs Viaje)</p></div></div>
+                    <div className="flex justify-between items-center mb-6 relative z-10"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><PieChart className="w-4 h-4 mr-2 text-orange-500"/> Distribución Horaria</h4><p className="text-[10px] text-slate-400 font-medium">Horas Totales (Productivas vs Viaje)</p></div></div>
                     <div className="h-64 relative z-10">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -1443,7 +1528,6 @@ export default function App() {
     const handleSaveMaintenance = async (e) => {
         e.preventDefault();
 
-        // VALIDACIÓN DE SUPERPOSICIÓN DE FECHAS PARA VEHÍCULO Y TÉCNICO EN MANTENIMIENTO
         if (maintenanceFormData.fecha) {
             const mDate = new Date(maintenanceFormData.fecha);
             
@@ -1507,12 +1591,10 @@ export default function App() {
             return;
         }
 
-        // VALIDACIÓN DE SUPERPOSICIÓN DE FECHAS PARA SERVICIOS
         if (formData.fInicio && formData.fFin) {
             const newStart = new Date(formData.fInicio);
             const newEnd = new Date(formData.fFin);
 
-            // Filtrar servicios cruzados
             const overlappingServices = services.filter(s => {
                 if (s.id === editingId) return false;
                 if (s.estado === 'Finalizado' || s.estado === 'No Finalizado') return false;
@@ -1522,7 +1604,6 @@ export default function App() {
                 return (newStart <= existingEnd) && (newEnd >= existingStart);
             });
 
-            // Filtrar mantenimientos de flota cruzados
             const overlappingMaintenance = maintenanceRecords.filter(m => {
                 if (m.estado === 'Realizado') return false;
                 if (!m.fecha) return false;
@@ -1534,7 +1615,6 @@ export default function App() {
             let conflictVeh = null;
             let conflictSource = null;
 
-            // Verificar si hay choques en servicios de campo o ausencias
             for (const s of overlappingServices) {
                 if (formData.tecnicos && formData.tecnicos.length > 0) {
                     conflictTech = formData.tecnicos.find(t => s.tecnicos?.includes(t));
@@ -1546,7 +1626,6 @@ export default function App() {
                 }
             }
 
-            // Verificar si hay choques en mantenimientos programados de la flota
             if (!conflictVeh && formData.vehiculos && formData.vehiculos.length > 0) {
                 for (const m of overlappingMaintenance) {
                     conflictVeh = formData.vehiculos.find(v => v === m.vehiculo);
@@ -1560,7 +1639,6 @@ export default function App() {
                 }
             }
 
-            // Si se detecta algún choque, prevenir guardado y notificar
             if (conflictTech) {
                 showNotification(`El técnico ${conflictTech} ya está afectado en esa fecha a ${conflictSource}.`, "error");
                 return;
@@ -1588,9 +1666,7 @@ export default function App() {
         if (!lastSavedService) return;
         const tech = tecnicosData.find(t => t.name === techName);
         if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
-        const duracion = (new Date(lastSavedService.fFin) - new Date(lastSavedService.fInicio)) / (1000 * 60 * 60 * 24) + 1;
-        const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${tipoDetallado}\n>> Iniciar en App al llegar.`;
+        const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n>> Iniciar en App al llegar.`;
         window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
@@ -1599,8 +1675,7 @@ export default function App() {
         const tech = tecnicosData.find(t => t.name === techName);
         if (!tech || !tech.email) { showNotification(`Sin correo para ${techName}`, "error"); return; }
         const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente}`);
-        const tipoDetallado = lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo;
-        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nFecha: ${formatDate(lastSavedService.fInicio)} al ${formatDate(lastSavedService.fFin)}\nTarea: ${tipoDetallado}\n\nRevisa el portal.`);
+        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nFecha: ${formatDate(lastSavedService.fInicio)} al ${formatDate(lastSavedService.fFin)}\nTarea: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n\nRevisa el portal.`);
         window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
     };
 
@@ -1848,7 +1923,7 @@ export default function App() {
                             )}
                             {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
-                            {activeTab === 'kpis' && <KPIs services={services} />}
+                            {activeTab === 'kpis' && <KPIs services={services} maintenanceRecords={maintenanceRecords} />}
                         </div>
                     ) : (
                         <div className="max-w-7xl mx-auto h-full">

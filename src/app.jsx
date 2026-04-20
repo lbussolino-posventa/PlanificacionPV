@@ -4,7 +4,7 @@ import {
   Trash2, Plus, X, Search, Edit2, LogOut, Menu, Copy, MessageCircle, Settings, 
   Phone, Lock, UserPlus, ExternalLink, Paperclip, FileText, Image as ImageIcon, 
   History, Eye, Save, XCircle, CheckSquare, List, MapPin, PlayCircle, Clock, Activity,
-  Briefcase, ChevronRight, Globe, Map as MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
+  Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
   Columns, Wrench, BarChart, Factory, Mail
@@ -422,6 +422,27 @@ const TechReportViewer = ({ service }) => {
   const logs = service.progressLogs || [];
   const hours = service.dailyLogs || [];
   const closure = service.closureData;
+
+  const handleDeleteLog = async (logToRemove) => {
+      if(!window.confirm('¿Seguro que deseas eliminar este registro de la bitácora?')) return;
+      const newLogs = logs.filter(l => l !== logToRemove);
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', service.id), { progressLogs: newLogs });
+      } catch (error) {
+          console.error("Error al eliminar log", error);
+      }
+  };
+
+  const handleDeleteHour = async (hourToRemove) => {
+      if(!window.confirm('¿Seguro que deseas eliminar este parte diario?')) return;
+      const newHours = hours.filter(h => h !== hourToRemove);
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', service.id), { dailyLogs: newHours });
+      } catch (error) {
+          console.error("Error al eliminar horas", error);
+      }
+  };
+
   return (
     <div className="mt-6 border-t border-slate-200 pt-6">
       <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center"><FolderOpen className="w-4 h-4 mr-2 text-orange-600"/> REPORTE TÉCNICO DE CAMPO</h4>
@@ -435,8 +456,11 @@ const TechReportViewer = ({ service }) => {
           <div className="space-y-3">
             {logs.length === 0 ? <p className="text-xs text-slate-400 italic text-center">Sin avances registrados.</p> : 
               logs.sort((a,b) => new Date(b.date) - new Date(a.date)).map((log, idx) => (
-                <div key={idx} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                  <div className="flex justify-between mb-1"><span className="text-xs font-bold text-slate-700">{log.date && log.date.includes(',') ? `${formatDate(log.date.split(',')[0])} ${log.date.split(',')[1]}` : log.date}</span></div>
+                <div key={idx} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm relative group">
+                  <div className="flex justify-between items-start mb-1">
+                      <span className="text-xs font-bold text-slate-700">{log.date && log.date.includes(',') ? `${formatDate(log.date.split(',')[0])} ${log.date.split(',')[1]}` : log.date}</span>
+                      <button onClick={() => handleDeleteLog(log)} className="text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5"/></button>
+                  </div>
                   <p className="text-xs text-slate-600 mb-2">{log.comment}</p>
                   <div className="flex gap-2 flex-wrap">{log.files && log.files.map((f, i) => (<a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-blue-50 text-blue-600 text-[10px] rounded border border-blue-100 hover:bg-blue-100"><Paperclip className="w-3 h-3 mr-1"/> {f.name}</a>))}</div>
                 </div>
@@ -445,7 +469,7 @@ const TechReportViewer = ({ service }) => {
           </div>
         )}
         {activeTab === 'hours' && (
-          <div><table className="w-full text-xs text-left"><thead><tr className="text-slate-400 border-b border-slate-200"><th className="pb-2">Fecha</th><th className="pb-2">Personal</th><th className="pb-2">Tipo</th><th className="pb-2">Horario</th><th className="pb-2 text-right">Hs Total</th></tr></thead><tbody>{hours.length===0?<tr><td colSpan="6" className="text-center py-4 text-slate-400 italic">Sin horas cargadas.</td></tr>:hours.map((h,i)=>{const start=new Date(`2000-01-01T${h.start}`);const end=new Date(`2000-01-01T${h.end}`);let duration=(end-start)/(1000*60*60);if(duration<0)duration+=24;const workerList=h.workers||[];const techCount=workerList.length>0?workerList.length:1;const totalManHours=duration*techCount;const workerDisplay=(workerList.length>0)?workerList.join(', '):'Equipo Completo';return(<tr key={i} className="border-b border-slate-100 last:border-0"><td className="py-2 font-medium text-slate-700">{formatDate(h.date)}</td><td className="py-2 text-slate-500 max-w-[100px] truncate" title={workerDisplay}>{workerDisplay}</td><td className="py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.type==='Viaje'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700'}`}>{h.type||'Trabajo'}</span></td><td className="py-2 text-slate-600">{h.start} - {h.end}</td><td className="py-2 font-bold text-slate-800 text-right">{totalManHours.toFixed(1)}{techCount>1&&<span className="text-[10px] text-slate-400 font-normal ml-1 block">({duration.toFixed(1)}h x {techCount})</span>}</td></tr>)})}</tbody></table></div>
+          <div><table className="w-full text-xs text-left"><thead><tr className="text-slate-400 border-b border-slate-200"><th className="pb-2">Fecha</th><th className="pb-2">Personal</th><th className="pb-2">Tipo</th><th className="pb-2">Horario</th><th className="pb-2 text-right">Hs Total</th><th className="pb-2"></th></tr></thead><tbody>{hours.length===0?<tr><td colSpan="6" className="text-center py-4 text-slate-400 italic">Sin horas cargadas.</td></tr>:hours.map((h,i)=>{const start=new Date(`2000-01-01T${h.start}`);const end=new Date(`2000-01-01T${h.end}`);let duration=(end-start)/(1000*60*60);if(duration<0)duration+=24;const workerList=h.workers||[];const techCount=workerList.length>0?workerList.length:1;const totalManHours=duration*techCount;const workerDisplay=(workerList.length>0)?workerList.join(', '):'Equipo Completo';return(<tr key={i} className="border-b border-slate-100 last:border-0 group"><td className="py-2 font-medium text-slate-700">{formatDate(h.date)}</td><td className="py-2 text-slate-500 max-w-[100px] truncate" title={workerDisplay}>{workerDisplay}</td><td className="py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.type==='Viaje'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700'}`}>{h.type||'Trabajo'}</span></td><td className="py-2 text-slate-600">{h.start} - {h.end}</td><td className="py-2 font-bold text-slate-800 text-right">{totalManHours.toFixed(1)}{techCount>1&&<span className="text-[10px] text-slate-400 font-normal ml-1 block">({duration.toFixed(1)}h x {techCount})</span>}</td><td className="py-2 text-right opacity-0 group-hover:opacity-100"><button onClick={() => handleDeleteHour(h)} className="text-slate-300 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5"/></button></td></tr>)})}</tbody></table></div>
         )}
         {activeTab === 'closure' && (
           <div>
@@ -495,9 +519,9 @@ const MapDashboard = ({ services }) => {
 
                 PRELOADED_LOCATIONS.forEach(loc => addMarkerIfUnique(loc.lat, loc.lng, loc.popupContent));
 
-                const finishedServices = services.filter(s => 
-                    s.estado === 'Finalizado' && 
-                    s.ubicacion && 
+                const finishedServices = services.filter(s => 
+                    s.estado === 'Finalizado' && 
+                    s.ubicacion && 
                     (s.tipoTrabajo === "Montaje de Transformador" || s.tipoTrabajo === "Supervisión de Montaje")
                 );
                 for (const s of finishedServices) {
@@ -648,25 +672,21 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
         return base.filter(s => s.estado !== 'Finalizado');
     }, [services, maintenanceRecords, mode]);
 
-    // --- LÓGICA DE FECHAS CORREGIDA ---
     const today = new Date(); 
     today.setHours(0,0,0,0);
 
-    // Forzamos que el inicio del calendario sea SIEMPRE hoy
     const minDate = new Date(today); 
     
-    // El máximo será 60 días desde hoy para dar perspectiva, o la fecha más lejana de los servicios
     const serviceDates = visibleServices.flatMap(s => [new Date(s.fFin)]).filter(d => !isNaN(d.getTime()));
     const maxServiceDate = serviceDates.length > 0 ? new Date(Math.max(...serviceDates)) : new Date(today);
     
     const maxDate = new Date(maxServiceDate);
-    maxDate.setDate(maxDate.getDate() + 15); // Margen de 15 días extra al final
+    maxDate.setDate(maxDate.getDate() + 15); 
 
     const DAY_WIDTH = 50; 
-    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); // Mínimo 30 días de vista
+    const totalDays = Math.max((maxDate - minDate) / (1000 * 60 * 60 * 24), 30); 
     const chartWidth = totalDays * DAY_WIDTH;
 
-    // Filtrar servicios que terminan antes de hoy para no ensuciar la vista
     const sortedVisibleServices = [...visibleServices]
         .filter(s => new Date(s.fFin) >= minDate)
         .sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
@@ -719,7 +739,6 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                      const start = new Date(srv.fInicio);
                      const end = new Date(srv.fFin);
                      
-                     // Ajustar visualmente si la tarea empezó antes de hoy pero termina después
                      const effectiveStart = start < minDate ? minDate : start;
                      
                      let offsetDays = (effectiveStart - minDate) / (1000 * 60 * 60 * 24);
@@ -752,7 +771,6 @@ const GanttChart = ({ services, maintenanceRecords = [], mode = 'operations', ha
                      );
                    })}
                </div>
-               {/* Línea de hoy */}
                <div className="absolute top-12 left-48 bottom-0 pointer-events-none flex">
                   {Array.from({ length: Math.ceil(totalDays) }).map((_, i) => (
                     <div key={i} className="border-r border-slate-100 h-full" style={{ width: `${DAY_WIDTH}px` }}></div>
@@ -1159,7 +1177,6 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                     {m.km && <div className="flex items-center"><Activity className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {m.km} km</div>}
                                                 </div>
                                                 
-                                                {/* Botón para marcar el vehículo como entregado en taller */}
                                                 {m.estado === 'Pendiente' && (
                                                     <button 
                                                         onClick={() => onMaintenanceStatusChange(m.id, 'En Taller')}
@@ -1425,6 +1442,43 @@ export default function App() {
 
     const handleSaveMaintenance = async (e) => {
         e.preventDefault();
+
+        // VALIDACIÓN DE SUPERPOSICIÓN DE FECHAS PARA VEHÍCULO Y TÉCNICO EN MANTENIMIENTO
+        if (maintenanceFormData.fecha) {
+            const mDate = new Date(maintenanceFormData.fecha);
+            
+            const overlappingServices = services.filter(s => {
+                if (s.estado === 'Finalizado' || s.estado === 'No Finalizado') return false;
+                if (!s.fInicio || !s.fFin) return false;
+                const existingStart = new Date(s.fInicio);
+                const existingEnd = new Date(s.fFin);
+                return (mDate <= existingEnd) && (mDate >= existingStart);
+            });
+
+            let conflictTech = null;
+            let conflictVeh = null;
+
+            for (const s of overlappingServices) {
+                if (maintenanceFormData.vehiculo && s.vehiculos?.includes(maintenanceFormData.vehiculo)) {
+                    conflictVeh = maintenanceFormData.vehiculo;
+                    break;
+                }
+                if (maintenanceFormData.tecnicoAsignado && s.tecnicos?.includes(maintenanceFormData.tecnicoAsignado)) {
+                    conflictTech = maintenanceFormData.tecnicoAsignado;
+                    break;
+                }
+            }
+
+            if (conflictVeh) {
+                showNotification(`El vehículo ${conflictVeh} está afectado a un servicio en esta fecha.`, "error");
+                return;
+            }
+            if (conflictTech) {
+                showNotification(`El técnico ${conflictTech} está afectado a un servicio en esta fecha.`, "error");
+                return;
+            }
+        }
+
         if (editingMaintenanceId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', editingMaintenanceId), maintenanceFormData); showNotification("Registro actualizado"); } 
         else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), maintenanceFormData); showNotification("Mantenimiento agendado"); }
         setIsMaintenanceModalOpen(false);
@@ -1447,10 +1501,76 @@ export default function App() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
         if ((formData.tipoTrabajo === "Montaje de Transformador" || formData.tipoTrabajo === "Supervisión de Montaje") && !formData.ubicacion) {
             showNotification("La ubicación es obligatoria para trabajos de Montaje o Supervisión.", "error");
             return;
         }
+
+        // VALIDACIÓN DE SUPERPOSICIÓN DE FECHAS PARA SERVICIOS
+        if (formData.fInicio && formData.fFin) {
+            const newStart = new Date(formData.fInicio);
+            const newEnd = new Date(formData.fFin);
+
+            // Filtrar servicios cruzados
+            const overlappingServices = services.filter(s => {
+                if (s.id === editingId) return false;
+                if (s.estado === 'Finalizado' || s.estado === 'No Finalizado') return false;
+                if (!s.fInicio || !s.fFin) return false;
+                const existingStart = new Date(s.fInicio);
+                const existingEnd = new Date(s.fFin);
+                return (newStart <= existingEnd) && (newEnd >= existingStart);
+            });
+
+            // Filtrar mantenimientos de flota cruzados
+            const overlappingMaintenance = maintenanceRecords.filter(m => {
+                if (m.estado === 'Realizado') return false;
+                if (!m.fecha) return false;
+                const mDate = new Date(m.fecha);
+                return (newStart <= mDate) && (newEnd >= mDate);
+            });
+
+            let conflictTech = null;
+            let conflictVeh = null;
+            let conflictSource = null;
+
+            // Verificar si hay choques en servicios de campo o ausencias
+            for (const s of overlappingServices) {
+                if (formData.tecnicos && formData.tecnicos.length > 0) {
+                    conflictTech = formData.tecnicos.find(t => s.tecnicos?.includes(t));
+                    if (conflictTech) { conflictSource = s.tipoTrabajo === 'Vacaciones' ? 'vacaciones/ausencia' : `el servicio a ${s.cliente}`; break; }
+                }
+                if (formData.vehiculos && formData.vehiculos.length > 0) {
+                    conflictVeh = formData.vehiculos.find(v => s.vehiculos?.includes(v));
+                    if (conflictVeh) { conflictSource = `el servicio a ${s.cliente}`; break; }
+                }
+            }
+
+            // Verificar si hay choques en mantenimientos programados de la flota
+            if (!conflictVeh && formData.vehiculos && formData.vehiculos.length > 0) {
+                for (const m of overlappingMaintenance) {
+                    conflictVeh = formData.vehiculos.find(v => v === m.vehiculo);
+                    if (conflictVeh) { conflictSource = `mantenimiento de flota programado`; break; }
+                }
+            }
+            if (!conflictTech && formData.tecnicos && formData.tecnicos.length > 0) {
+                for (const m of overlappingMaintenance) {
+                    conflictTech = formData.tecnicos.find(t => t === m.tecnicoAsignado);
+                    if (conflictTech) { conflictSource = `tareas de mantenimiento a ${m.vehiculo}`; break; }
+                }
+            }
+
+            // Si se detecta algún choque, prevenir guardado y notificar
+            if (conflictTech) {
+                showNotification(`El técnico ${conflictTech} ya está afectado en esa fecha a ${conflictSource}.`, "error");
+                return;
+            }
+            if (conflictVeh) {
+                showNotification(`El vehículo ${conflictVeh} ya está afectado en esa fecha a ${conflictSource}.`, "error");
+                return;
+            }
+        }
+
         const serviceData = { 
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,

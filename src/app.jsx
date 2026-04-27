@@ -1432,8 +1432,8 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                         {/* Observaciones */}
                         {previewService.observaciones && (
                             <div>
-                                <h4 className="font-bold text-slate-700 mb-2 flex items-center text-sm"><FileText className="w-4 h-4 mr-2 text-emerald-500"/> Observaciones Iniciales</h4>
-                                <div className="bg-amber-50 border border-amber-100 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                <h4 className="font-bold text-slate-400 mb-2 flex items-center text-sm"><FileText className="w-4 h-4 mr-2 text-emerald-500"/> Observaciones Iniciales</h4>
+                                <div className="bg-slate-900 border border-slate-700 p-4 rounded-lg text-sm text-slate-100 whitespace-pre-wrap leading-relaxed shadow-inner">
                                     {previewService.observaciones}
                                 </div>
                             </div>

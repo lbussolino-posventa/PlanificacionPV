@@ -1199,117 +1199,130 @@ const TransformerHistory = ({ services }) => {
 };
 
 const TechPortal = ({ services, maintenanceRecords, user, handleStartService, onMaintenanceStatusChange, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
-    const [view, setView] = useState('list'); 
-    const [hideCompleted, setHideCompleted] = useState(false);
+    const [view, setView] = useState('list'); 
+    const [hideCompleted, setHideCompleted] = useState(false);
 
-    const myServices = useMemo(() => {
-        let list = services.filter(s => s.tecnicos && s.tecnicos.includes(user.name));
-        if (hideCompleted) {
-            list = list.filter(s => s.estado !== 'Finalizado');
-        }
-        return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
-    }, [services, user.name, hideCompleted]);
+    const myServices = useMemo(() => {
+        let list = services.filter(s => s.tecnicos && s.tecnicos.includes(user.name));
+        if (hideCompleted) {
+            list = list.filter(s => s.estado !== 'Finalizado');
+        }
+        return list.sort((a,b) => new Date(a.fInicio) - new Date(b.fInicio));
+    }, [services, user.name, hideCompleted]);
 
-    const myMaintenance = useMemo(() => {
-        let list = (maintenanceRecords || []).filter(m => m.tecnicoAsignado === user.name);
-        if (hideCompleted) list = list.filter(m => m.estado !== 'Realizado');
-        return list.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-    }, [maintenanceRecords, user.name, hideCompleted]);
+    const myMaintenance = useMemo(() => {
+        let list = (maintenanceRecords || []).filter(m => m.tecnicoAsignado === user.name);
+        if (hideCompleted) list = list.filter(m => m.estado !== 'Realizado');
+        return list.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+    }, [maintenanceRecords, user.name, hideCompleted]);
 
-    return (
-        <div className="space-y-6 animate-in fade-in">
-            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
-                <div className="relative z-10 mb-4 md:mb-0">
-                    <h2 className="text-3xl font-extrabold mb-1">Hola, {user.name} 👋</h2>
-                    <p className="text-orange-100">Aquí tienes tus servicios y tareas asignadas.</p>
-                </div>
-                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex items-center">
-                    <label className="flex items-center space-x-2 cursor-pointer px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-white mr-2 border-r border-white/20">
-                        <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-500 w-4 h-4 rounded border-white/30" />
-                        <span className="text-xs font-bold">Ocultar Finalizados</span>
-                    </label>
-                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
-                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
-                </div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
-            </div>
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center">
+                <div className="relative z-10 mb-4 md:mb-0">
+                    <h2 className="text-3xl font-extrabold mb-1">Hola, {user.name} 👋</h2>
+                    <p className="text-orange-100">Aquí tienes tus servicios y tareas asignadas.</p>
+                </div>
+                <div className="relative z-10 bg-white/20 p-1 rounded-xl flex items-center">
+                    <label className="flex items-center space-x-2 cursor-pointer px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-white mr-2 border-r border-white/20">
+                        <input type="checkbox" checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} className="accent-orange-500 w-4 h-4 rounded border-white/30" />
+                        <span className="text-xs font-bold">Ocultar Finalizados</span>
+                    </label>
+                    <button onClick={()=>setView('list')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='list'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><List className="w-4 h-4 inline-block mr-2"/> Lista</button>
+                    <button onClick={()=>setView('gantt')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view==='gantt'?'bg-white text-orange-600 shadow-sm':'text-white hover:bg-white/10'}`}><Calendar className="w-4 h-4 inline-block mr-2"/> Calendario</button>
+                </div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+            </div>
 
-            <div className="space-y-6">
-                {view === 'list' ? (
-                    <>
-                        {myMaintenance.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Truck className="w-4 h-4 mr-2"/> Tareas de Flota Asignadas</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {myMaintenance.map(m => (
-                                        <div key={m.id} className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-5 flex flex-col relative overflow-hidden group">
-                                            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
-                                            <div className="pl-2">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':m.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>{m.estado}</span>
-                                                    <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">Mantenimiento de Vehículo</span>
-                                                </div>
-                                                <h3 className="font-black text-lg text-slate-800 mb-1">{m.vehiculo}</h3>
-                                                <p className="text-sm text-slate-600 mb-3">{m.tipo} {m.observaciones && `- ${m.observaciones}`}</p>
-                                                <div className="flex items-center gap-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 w-fit">
-                                                    <div className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {formatDate(m.fecha)}</div>
-                                                    {m.km && <div className="flex items-center"><Activity className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {m.km} km</div>}
-                                                </div>
-                                                
-                                                {m.estado === 'Pendiente' && (
-                                                    <button 
-                                                        onClick={() => onMaintenanceStatusChange(m.id, 'En Taller')}
-                                                        className="mt-4 w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex justify-center items-center text-xs shadow-md active:scale-95"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4 mr-2"/> Entregado / En Taller
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+            <div className="space-y-6">
+                {view === 'list' ? (
+                    <>
+                        {myMaintenance.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Truck className="w-4 h-4 mr-2"/> Tareas de Flota Asignadas</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {myMaintenance.map(m => (
+                                        <div key={m.id} className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-5 flex flex-col relative overflow-hidden group">
+                                            <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
+                                            <div className="pl-2">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.estado==='Realizado'?'bg-emerald-50 border-emerald-200 text-emerald-700':m.estado==='En Taller'?'bg-blue-50 border-blue-200 text-blue-700':'bg-amber-50 border-amber-200 text-amber-700'}`}>{m.estado}</span>
+                                                    <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">Mantenimiento de Vehículo</span>
+                                                </div>
+                                                <h3 className="font-black text-lg text-slate-800 mb-1">{m.vehiculo}</h3>
+                                                <p className="text-sm text-slate-600 mb-3">{m.tipo} {m.observaciones && `- ${m.observaciones}`}</p>
+                                                <div className="flex items-center gap-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 w-fit">
+                                                    <div className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {formatDate(m.fecha)}</div>
+                                                    {m.km && <div className="flex items-center"><Activity className="w-3.5 h-3.5 mr-1.5 text-indigo-400"/> {m.km} km</div>}
+                                                </div>
+                                                
+                                                {m.estado === 'Pendiente' && (
+                                                    <button 
+                                                        onClick={() => onMaintenanceStatusChange(m.id, 'En Taller')}
+                                                        className="mt-4 w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex justify-center items-center text-xs shadow-md active:scale-95"
+                                                    >
+                                                        <CheckCircle className="w-4 h-4 mr-2"/> Entregado / En Taller
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-                        {myServices.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
-                                <div className="grid grid-cols-1 gap-5">
-                                    {myServices.map(srv => (
-                                        <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
-                                                <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
-                                                
-                                                {srv.contactoResponsable && (
-                                                    <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
-                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                        {myServices.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
+                                <div className="grid grid-cols-1 gap-5">
+                                    {myServices.map(srv => (
+                                        <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-3"><span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${srv.estado==='Finalizado'?'bg-emerald-50 border-emerald-100 text-emerald-700':srv.estado==='En Servicio'?'bg-blue-50 border-blue-100 text-blue-700':srv.estado==='No Finalizado'?'bg-rose-50 border-rose-100 text-rose-700':'bg-amber-50 border-amber-100 text-amber-700'}`}>{srv.estado}</span><span className="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">OCI: {srv.oci}</span></div>
+                                                <h3 className="font-bold text-xl text-slate-800 mb-1">{srv.cliente}</h3>
+                                                
+                                                {srv.contactoResponsable && (
+                                                    <div className="mb-3 text-xs bg-orange-50 text-orange-800 p-2 rounded-lg inline-flex items-center border border-orange-100 font-medium">
+                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5"/> Contacto: {srv.contactoResponsable}
+                                                    </div>
+                                                )}
+
+                                                {/* AQUÍ LA MODIFICACIÓN PARA MOSTRAR EL EQUIPO Y VEHÍCULO JUNTOS */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2">
+                                                    <div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400 shrink-0"/> <span className="truncate">{formatDate(srv.fInicio)} ➔ {formatDate(srv.fFin)}</span></div>
+                                                    <div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400 shrink-0"/> <span className="truncate">{(srv.vehiculos && srv.vehiculos.length > 0) ? srv.vehiculos.join(', ') : 'Sin vehículo asignado'}</span></div>
+                                                    <div className="flex items-center md:col-span-2 mt-1 pt-3 border-t border-slate-200/60">
+                                                        <Users className="w-4 h-4 mr-2 text-orange-500 shrink-0"/>
+                                                        <span className="truncate">
+                                                            <strong className="text-slate-700 mr-1">Equipo asignado:</strong>
+                                                            {srv.tecnicos?.length > 1
+                                                                ? srv.tecnicos.filter(t => t !== user.name).join(', ') + ' y Tú'
+                                                                : 'Asignación individual'}
+                                                        </span>
                                                     </div>
-                                                )}
-
-                                                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-2"><div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-slate-400"/> {formatDate(srv.fInicio)} ➔ {formatDate(srv.fFin)}</div><div className="flex items-center"><Truck className="w-4 h-4 mr-2 text-slate-400"/> {(srv.vehiculos || []).join(', ')}</div></div>
-                                            </div>
-                                            <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
-                                                {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
-                                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
-                                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
-                                                {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {myServices.length === 0 && myMaintenance.length === 0 && (
-                            <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No tienes tareas ni mantenimientos asignados actualmente.</div>
-                        )}
-                    </>
-                ) : (
-                    <GanttChart services={myServices} maintenanceRecords={myMaintenance} mode="mixed" isAdmin={false} handleEdit={()=>{}} />
-                )}
-            </div>
-        </div>
-    );
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
+                                                {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
+                                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
+                                                {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
+                                                {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {myServices.length === 0 && myMaintenance.length === 0 && (
+                            <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No tienes tareas ni mantenimientos asignados actualmente.</div>
+                        )}
+                    </>
+                ) : (
+                    <GanttChart services={myServices} maintenanceRecords={myMaintenance} mode="mixed" isAdmin={false} handleEdit={()=>{}} />
+                )}
+            </div>
+        </div>
+    );
 };
 
 const LoginScreen = ({ onLogin, tecnicosData }) => {

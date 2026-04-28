@@ -1201,8 +1201,23 @@ const TransformerHistory = ({ services }) => {
 const TechPortal = ({ services, maintenanceRecords, user, handleStartService, onMaintenanceStatusChange, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
     const [view, setView] = useState('list'); 
     const [hideCompleted, setHideCompleted] = useState(false);
-    // NUEVO ESTADO: Para controlar el modal de previsualización
     const [previewService, setPreviewService] = useState(null);
+
+    // NUEVO EFFECT: Interceptar botón atrás del celular
+    useEffect(() => {
+        const handleBack = (e) => {
+            if (previewService) {
+                e.preventDefault(); 
+                setPreviewService(null); 
+            } else if (view === 'gantt') {
+                e.preventDefault();
+                setView('list'); 
+            }
+        };
+
+        window.addEventListener('app-back', handleBack);
+        return () => window.removeEventListener('app-back', handleBack);
+    }, [previewService, view]);
 
     const myServices = useMemo(() => {
         let list = services.filter(s => s.tecnicos && s.tecnicos.includes(user.name));
@@ -1525,9 +1540,43 @@ export default function App() {
     const [notification, setNotification] = useState(null);
     const [showMsgModal, setShowMsgModal] = useState(false);
 
+    // --- HISTORIAL PWA / NAVEGACIÓN ---
+    const changeTab = (newTab) => {
+        if (activeTab !== newTab) {
+            window.history.pushState({ tab: newTab }, '');
+            setActiveTab(newTab);
+        }
+    };
+
+    useEffect(() => {
+        if (!window.history.state?.tab) {
+            window.history.replaceState({ tab: activeTab }, '');
+        }
+
+        const handlePopState = (e) => {
+            const event = new CustomEvent('app-back', { cancelable: true });
+            window.dispatchEvent(event);
+
+            if (event.defaultPrevented) {
+                window.history.pushState({ tab: activeTab }, '');
+            } else {
+                if (e.state && e.state.tab) {
+                    setActiveTab(e.state.tab);
+                } else {
+                    window.history.pushState({ tab: activeTab }, ''); 
+                }
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [activeTab]);
+
     useEffect(() => {
         if (user) {
-            setActiveTab(user.role === 'admin' ? 'kanban' : 'tasks');
+            const initialTab = user.role === 'admin' ? 'kanban' : 'tasks';
+            setActiveTab(initialTab);
+            window.history.replaceState({ tab: initialTab }, '');
         }
     }, [user]);
 
@@ -1601,6 +1650,20 @@ export default function App() {
     const [reopeningService, setReopeningService] = useState(null);
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
+
+    // NUEVO EFFECT 2: Escuchar evento de retroceso para cerrar modales de App
+    useEffect(() => {
+        const handleBack = (e) => {
+            const anyOpen = isSidebarOpen || isManageTechOpen || isChangeAdminPasswordOpen || isMaintenanceModalOpen || showMsgModal || uploadingEvidenceService || loggingHoursService || closingService || reopeningService || deletingId;
+            
+            if (anyOpen) {
+                e.preventDefault(); 
+                setIsSidebarOpen(false); setIsManageTechOpen(false); setIsChangeAdminPasswordOpen(false); setIsMaintenanceModalOpen(false); setShowMsgModal(false); setUploadingEvidenceService(null); setLoggingHoursService(null); setClosingService(null); setReopeningService(null); setDeletingId(null);
+            }
+        };
+        window.addEventListener('app-back', handleBack);
+        return () => window.removeEventListener('app-back', handleBack);
+    }, [isSidebarOpen, isManageTechOpen, isChangeAdminPasswordOpen, isMaintenanceModalOpen, showMsgModal, uploadingEvidenceService, loggingHoursService, closingService, reopeningService, deletingId]);
     
     const [newTechName, setNewTechName] = useState("");
     const [newTechPhone, setNewTechPhone] = useState("");
@@ -1962,14 +2025,14 @@ export default function App() {
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
                                 {id:'history', label:'Historial', icon:History},
                                 {id:'kpis', label:'KPIs', icon:BarChart2} 
-                            ].map(tab=>(<button key={tab.id} onClick={()=>setActiveTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
+                            ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     )}
                     {!isAdmin && (
                         <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
-                            <button onClick={()=>setActiveTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button>
-                            <button onClick={()=>setActiveTab('map')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='map'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4 mr-2"/> Mapa Mundial</button>
-                            <button onClick={()=>setActiveTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><History className="w-4 h-4 mr-2"/> Historial</button>
+                            <button onClick={()=>changeTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button>
+                            <button onClick={()=>changeTab('map')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='map'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4 mr-2"/> Mapa Mundial</button>
+                            <button onClick={()=>changeTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><History className="w-4 h-4 mr-2"/> Historial</button>
                         </div>
                     )}
                 </header>

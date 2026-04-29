@@ -7,9 +7,9 @@ import {
   Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench, BarChart, Factory, Mail
+  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc, query, where, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -363,6 +363,48 @@ const GlobalStyles = () => (
     .leaflet-container { font-family: 'Inter', sans-serif; z-index: 0; }
     .animate-in { animation: fadeIn 0.3s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ESTILOS ESPECÍFICOS PARA EL FORMULARIO DE ENCUESTA (SURVEY) */
+    .survey-container {
+        background-color: #f0ebf8 !important; /* Fondo claro estilo Google Forms */
+        color: #202124 !important;
+        min-height: 100vh;
+    }
+    .survey-container h1, .survey-container h2, .survey-container h3, .survey-container label, .survey-container p, .survey-container span {
+        text-shadow: none !important;
+        color: #202124 !important;
+    }
+    .survey-card {
+        background-color: #ffffff !important;
+        border-radius: 8px !important;
+        border: 1px solid #dadce0 !important;
+        border-top: 10px solid #673ab7 !important; /* Borde superior morado característico */
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+    }
+    .survey-card-inner {
+        background-color: #ffffff !important;
+        border-radius: 8px !important;
+        border: 1px solid #dadce0 !important;
+        box-shadow: none !important;
+    }
+    .survey-input {
+        background-color: transparent !important;
+        border: none !important;
+        border-bottom: 1px solid #dadce0 !important;
+        border-radius: 0 !important;
+        padding: 8px 0 !important;
+        box-shadow: none !important;
+        color: #202124 !important;
+    }
+    .survey-input:focus {
+        border-bottom: 2px solid #673ab7 !important;
+        box-shadow: none !important;
+    }
+    .survey-radio-group input[type="radio"] {
+        accent-color: #673ab7 !important;
+        width: 20px;
+        height: 20px;
+    }
   `}</style>
 );
 
@@ -381,6 +423,301 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     </div>
   );
 };
+
+// ==========================================
+// NUEVO: FORMULARIO PÚBLICO DE ENCUESTA
+// ==========================================
+const SurveyForm = ({ serviceId }) => {
+    const [submitted, setSubmitted] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        nombreCompleto: '',
+        fechaAsistencia: new Date().toISOString().split('T')[0],
+        email: '',
+        empresa: '',
+        cargo: '',
+        motivo: '',
+        tipoTrabajo: ''
+    });
+
+    const [ratings, setRatings] = useState({ q1: null, q2: null, q3: null, q4: null, q5: null, q6: null, q7: null, q8: null });
+    const [observations, setObservations] = useState({ q1: '', q2: '', q3: '', q4: '', q5: '', q6: '', q7: '', q8: '' });
+
+    const handleRatingChange = (q, val) => setRatings(prev => ({ ...prev, [q]: val }));
+    const handleObsChange = (q, val) => setObservations(prev => ({ ...prev, [q]: val }));
+
+    const questions = [
+        { id: 'q1', title: '1. Califique la atención que el servicio de post venta le brindo previo a iniciar los trabajos.', obsLabel: 'Observaciones (Atención previa)' },
+        { id: 'q2', title: '2. Califique la coordinación y cumplimiento en la ejecución de los trabajos en sitio.', obsLabel: 'Observaciones (Coordinación y ejecución)' },
+        { id: 'q3', title: '3. Califique el estado de las herramientas y equipamiento utilizados por el servicio de post venta.', obsLabel: 'Observaciones (Herramientas y equipamiento)' },
+        { id: 'q4', title: '4. Califique el proceso de ensayos de TTE del transformador recibido.', obsLabel: 'Observaciones (Proceso de ensayos)' },
+        { id: 'q5', title: '5. Califique el desempeño del supervisor responsable en obra', obsLabel: 'Observaciones (Desempeño del supervisor)' },
+        { id: 'q6', title: '6. Califique el conocimiento del supervisor respecto al servicio realizado.', obsLabel: 'Observaciones (Conocimiento del supervisor)' },
+        { id: 'q7', title: '7. Califique el grado de cumplimiento del servicio solicitado inicialmente.', obsLabel: 'Observaciones (Cumplimiento del servicio)' },
+        { id: 'q8', title: '8. El servicio de post venta de TTE tiene como objetivo asistirlo hasta que su transformador esté en funcionamiento... ¿Recomendaría Ud. a nuestra área de Servicio Post Venta? Indique el grado de recomendación.', obsLabel: 'Comentarios (Recomendación)', labels: ['No Recomendable', 'Recomendable'] }
+    ];
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Validación básica
+        if(!formData.nombreCompleto || !formData.email || !formData.empresa || !formData.tipoTrabajo) {
+            alert("Por favor complete los campos obligatorios (*)");
+            return;
+        }
+
+        const missingRating = Object.keys(ratings).find(k => ratings[k] === null);
+        if (missingRating) {
+            alert("Por favor califique todas las preguntas con escala del 1 al 5.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const surveyDoc = {
+                serviceId,
+                timestamp: new Date().toISOString(),
+                ...formData,
+                ratings,
+                observations
+            };
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'surveys'), surveyDoc);
+            setSubmitted(true);
+        } catch (error) {
+            console.error("Error saving survey", error);
+            alert("Hubo un error al enviar la encuesta. Por favor intente nuevamente.");
+        }
+        setLoading(false);
+    };
+
+    if (submitted) {
+        return (
+            <div className="survey-container flex items-center justify-center p-4">
+                <div className="survey-card w-full max-w-3xl p-8 text-center">
+                    <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold mb-2">¡Gracias por su respuesta!</h2>
+                    <p className="text-gray-600">Su opinión es muy importante para ayudarnos a mejorar nuestro servicio de Post Venta.</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="survey-container font-sans p-4 pb-20">
+            <div className="max-w-3xl mx-auto space-y-4">
+                
+                {/* Header */}
+                <div className="survey-card p-6">
+                    <h1 className="text-3xl font-bold mb-2">Encuesta de Satisfacción - Servicio Post Venta</h1>
+                    <p className="text-sm text-gray-600 border-t border-gray-200 pt-4 mt-4">
+                        Por favor, complete la siguiente encuesta para evaluar el servicio recibido. Los campos marcados con <span className="text-red-500">*</span> son obligatorios.
+                    </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    
+                    {/* Datos Generales */}
+                    <div className="survey-card-inner p-6 space-y-6">
+                        <div>
+                            <label className="block font-semibold mb-1">Nombre completo <span className="text-red-500">*</span></label>
+                            <input type="text" className="survey-input w-full md:w-1/2" placeholder="Tu respuesta" value={formData.nombreCompleto} onChange={e=>setFormData({...formData, nombreCompleto: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Fecha de asistencia <span className="text-red-500">*</span></label>
+                            <input type="date" className="survey-input w-full md:w-1/3" value={formData.fechaAsistencia} onChange={e=>setFormData({...formData, fechaAsistencia: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Dirección de correo electrónico <span className="text-red-500">*</span></label>
+                            <input type="email" className="survey-input w-full md:w-1/2" placeholder="Tu respuesta" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Empresa a la que pertenece <span className="text-red-500">*</span></label>
+                            <input type="text" className="survey-input w-full md:w-1/2" placeholder="Tu respuesta" value={formData.empresa} onChange={e=>setFormData({...formData, empresa: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Cargo dentro de la empresa <span className="text-red-500">*</span></label>
+                            <input type="text" className="survey-input w-full md:w-1/2" placeholder="Tu respuesta" value={formData.cargo} onChange={e=>setFormData({...formData, cargo: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">Motivo de asistencia <span className="text-red-500">*</span></label>
+                            <textarea className="survey-input w-full resize-none h-10" placeholder="Tu respuesta" value={formData.motivo} onChange={e=>setFormData({...formData, motivo: e.target.value})} required />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-4">Tipo de trabajo <span className="text-red-500">*</span></label>
+                            <div className="space-y-3 survey-radio-group">
+                                {TIPOS_TRABAJO.filter(t=>t!=='Vacaciones' && t!=='Estudios Médicos').map(t => (
+                                    <label key={t} className="flex items-center space-x-3 cursor-pointer">
+                                        <input type="radio" name="tipoTrabajo" value={t} checked={formData.tipoTrabajo === t} onChange={e=>setFormData({...formData, tipoTrabajo: e.target.value})} required/>
+                                        <span>{t}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preguntas con Escala */}
+                    {questions.map((q, idx) => (
+                        <div key={q.id} className="space-y-4">
+                            <div className="survey-card-inner p-6">
+                                <label className="block font-semibold mb-6">{q.title} <span className="text-red-500">*</span></label>
+                                <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 survey-radio-group">
+                                    <span className="text-sm text-gray-500 font-medium hidden md:block">{q.labels ? q.labels[0] : 'Muy Insatisfecho'}</span>
+                                    <div className="flex justify-between w-full md:w-auto gap-4 md:gap-8">
+                                        {[1, 2, 3, 4, 5].map(val => (
+                                            <div key={val} className="flex flex-col items-center gap-2">
+                                                <span className="text-sm">{val}</span>
+                                                <input type="radio" name={q.id} value={val} checked={ratings[q.id] === val} onChange={() => handleRatingChange(q.id, val)} required/>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <span className="text-sm text-gray-500 font-medium hidden md:block">{q.labels ? q.labels[1] : 'Muy Satisfecho'}</span>
+                                </div>
+                                <div className="flex justify-between w-full mt-2 md:hidden">
+                                     <span className="text-xs text-gray-500">{q.labels ? q.labels[0] : 'Muy Insatisfecho'}</span>
+                                     <span className="text-xs text-gray-500">{q.labels ? q.labels[1] : 'Muy Satisfecho'}</span>
+                                </div>
+                            </div>
+                            <div className="survey-card-inner p-6">
+                                <label className="block font-semibold mb-2">{q.obsLabel}</label>
+                                <textarea className="survey-input w-full resize-none h-10" placeholder="Tu respuesta" value={observations[q.id]} onChange={(e) => handleObsChange(q.id, e.target.value)} />
+                            </div>
+                        </div>
+                    ))}
+
+                    <div className="flex justify-between items-center pt-4">
+                        <button type="submit" disabled={loading} className="bg-[#673ab7] hover:bg-[#5e35b1] text-white font-semibold py-2 px-6 rounded-md transition-colors disabled:opacity-50">
+                            {loading ? 'Enviando...' : 'Enviar'}
+                        </button>
+                        <span className="text-xs text-gray-400">Nunca envíes contraseñas a través de este formulario.</span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// NUEVO: DASHBOARD DE ENCUESTAS (ADMIN)
+// ==========================================
+const SurveyDashboard = ({ surveys }) => {
+    
+    // Calcular promedios
+    const averages = useMemo(() => {
+        if (!surveys || surveys.length === 0) return null;
+        
+        const sums = { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0 };
+        const counts = { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0 };
+
+        surveys.forEach(s => {
+            Object.keys(s.ratings || {}).forEach(k => {
+                if(s.ratings[k]) {
+                    sums[k] += Number(s.ratings[k]);
+                    counts[k] += 1;
+                }
+            });
+        });
+
+        const labels = {
+            q1: 'Atención Previa', q2: 'Coordinación', q3: 'Herramientas', q4: 'Ensayos TTE',
+            q5: 'Desempeño Sup.', q6: 'Conocimiento Sup.', q7: 'Cumplimiento', q8: 'Recomendación'
+        };
+
+        const result = Object.keys(sums).map(k => ({
+            name: labels[k],
+            promedio: counts[k] > 0 ? parseFloat((sums[k] / counts[k]).toFixed(1)) : 0,
+            fullMark: 5
+        }));
+
+        const globalAvg = result.reduce((acc, curr) => acc + curr.promedio, 0) / (result.length || 1);
+
+        return { data: result, global: globalAvg.toFixed(1) };
+    }, [surveys]);
+
+    if (!surveys || surveys.length === 0) {
+        return (
+            <div className="p-12 text-center text-slate-400 bg-white/90 rounded-2xl border border-dashed border-slate-200">
+                <ClipboardList className="w-12 h-12 mx-auto mb-4 text-slate-300"/>
+                <p>No hay respuestas de encuestas registradas todavía.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in pb-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Resumen Global */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
+                    <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                        <Star className="w-8 h-8 text-emerald-500 fill-emerald-500"/>
+                    </div>
+                    <h3 className="text-4xl font-black text-slate-800 mb-1">{averages.global} <span className="text-lg text-slate-400">/ 5</span></h3>
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Satisfacción General Promedio</p>
+                    <p className="text-xs text-slate-400 mt-2">Basado en {surveys.length} respuesta(s)</p>
+                </div>
+
+                {/* Radar Chart de Métricas */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-2 h-80">
+                    <h4 className="font-bold text-slate-800 text-sm mb-4">Promedio por Categoría</h4>
+                    <ResponsiveContainer width="100%" height="85%">
+                        <RechartsBarChart data={averages.data} layout="vertical" margin={{ left: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9"/>
+                            <XAxis type="number" domain={[0, 5]} hide/>
+                            <YAxis dataKey="name" type="category" width={120} tick={{fontSize:11, fill:'#64748b', fontWeight: 600}} axisLine={false} tickLine={false}/>
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
+                            <Bar dataKey="promedio" fill="#673ab7" radius={[0, 4, 4, 0]} barSize={20} label={{ position: 'right', fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} />
+                        </RechartsBarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Tabla de Respuestas */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50">
+                    <h3 className="font-bold text-slate-700 text-sm flex items-center"><MessageSquare className="w-4 h-4 mr-2 text-indigo-500"/> Respuestas Individuales</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50/50">
+                            <tr>
+                                <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-[10px]">Fecha / Cliente</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-[10px]">Servicio</th>
+                                <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase tracking-wider text-[10px]">Promedio</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-[10px]">Motivo / Comentario Principal</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {surveys.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((s, i) => {
+                                const avg = (Object.values(s.ratings||{}).reduce((a,b)=>a+Number(b),0) / 8).toFixed(1);
+                                return (
+                                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-slate-800">{s.empresa}</div>
+                                            <div className="text-xs text-slate-500">{formatDate(s.fechaAsistencia)} • {s.nombreCompleto}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded">{s.tipoTrabajo}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`font-black text-sm ${avg >= 4 ? 'text-emerald-600' : avg >= 3 ? 'text-amber-600' : 'text-rose-600'}`}>{avg}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-600 max-w-xs truncate" title={s.motivo}>
+                                            <span className="font-bold text-slate-400">Motivo:</span> {s.motivo}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// COMPONENTES EXISTENTES ACTUALIZADOS
+// ==========================================
 
 const FileUploader = ({ files, setFiles, label, required = false }) => {
   const fileInputRef = useRef(null);
@@ -796,7 +1133,6 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
     
     const servicesForCalc = filteredServices.filter(s => s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
 
-    // Extraer meses para ordenarlos de forma cronológica (formato interno YYYY-MM)
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const formatMonthKey = (dateObj) => {
         if(isNaN(dateObj)) return null;
@@ -816,7 +1152,6 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
     let totalTravelHours = 0;
 
     servicesForCalc.forEach(s => {
-        // Tiempos de Respuesta y Volumen Mensual (Orden cronológico YYYY-MM)
         if (s.fInicio) {
             const dInicio = new Date(s.fInicio);
             const mKey = formatMonthKey(dInicio);
@@ -835,7 +1170,6 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
             }
         }
 
-        // Horas Trabajadas (Distribución Horaria y por mes)
         const logs = Array.isArray(s.dailyLogs) ? s.dailyLogs : [];
         logs.forEach(log => {
             if (!log.start || !log.end || !log.date) return;
@@ -879,7 +1213,6 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
 
     const dataHoursType = [{ name: 'Trabajo', value: parseFloat(totalWorkHours.toFixed(1)) || 0 }, { name: 'Viaje', value: parseFloat(totalTravelHours.toFixed(1)) || 0 }];
 
-    // Velocímetro (Kilometraje de vehículos leídos desde el doc del vehículo)
     const validVehicles = vehiculosData.filter(v => {
         const vLow = (v.name || '').toLowerCase();
         return !vLow.includes('aereo') && !vLow.includes('aéreo') && !vLow.includes('alquiler');
@@ -963,7 +1296,6 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
                 ))}
             </div>
             
-            {/* NUEVOS GRÁFICOS: Velocímetro y Horas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden h-80">
                     <div className="flex justify-between items-center mb-2">
@@ -1198,12 +1530,11 @@ const TransformerHistory = ({ services }) => {
     );
 };
 
-const TechPortal = ({ services, maintenanceRecords, user, handleStartService, onMaintenanceStatusChange, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason }) => {
+const TechPortal = ({ services, maintenanceRecords, user, handleStartService, onMaintenanceStatusChange, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason, showNotification }) => {
     const [view, setView] = useState('list'); 
     const [hideCompleted, setHideCompleted] = useState(false);
     const [previewService, setPreviewService] = useState(null);
 
-    // NUEVO EFFECT: Interceptar botón atrás del celular
     useEffect(() => {
         const handleBack = (e) => {
             if (previewService) {
@@ -1232,6 +1563,13 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
         if (hideCompleted) list = list.filter(m => m.estado !== 'Realizado');
         return list.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
     }, [maintenanceRecords, user.name, hideCompleted]);
+
+    const handleShareSurvey = (e, serviceId) => {
+        e.stopPropagation();
+        const link = `${window.location.origin}${window.location.pathname}?survey=true&serviceId=${serviceId}`;
+        navigator.clipboard.writeText(link);
+        showNotification("Link de encuesta copiado al portapapeles", "success");
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -1328,7 +1666,13 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                             {/* BOTONES DE ACCIÓN (Independientes del click principal) */}
                                             <div className="flex flex-col gap-3 justify-center min-w-[180px] border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0">
                                                 {srv.estado === 'Agendado' && <button onClick={() => handleStartService(srv)} className="bg-blue-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center transition-all active:scale-95"><PlayCircle className="w-5 h-5 mr-2"/> Iniciar Tarea</button>}
-                                                {srv.estado === 'En Servicio' && (<><button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button><button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button></>)}
+                                                {srv.estado === 'En Servicio' && (
+                                                    <>
+                                                        <button onClick={(e) => handleShareSurvey(e, srv.id)} className="bg-emerald-50 text-emerald-700 border border-emerald-200 py-2 px-3 rounded-lg font-bold hover:bg-emerald-100 flex items-center justify-center text-xs transition-colors shadow-sm"><Share2 className="w-4 h-4 mr-2"/> Encuesta a Cliente</button>
+                                                        <button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button>
+                                                        <button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button>
+                                                    </>
+                                                )}
                                                 {srv.estado === 'En Servicio' && <button onClick={() => { setClosingService(srv); setClosureData({status:'Finalizado', reasonType: '', reason:'', observation: '', files:[]}); }} className="bg-white text-orange-600 border-2 border-orange-600 py-3 px-4 rounded-xl font-bold hover:bg-orange-50 flex items-center justify-center transition-colors mt-1"><CheckCircle className="w-5 h-5 mr-2"/> Cerrar Servicio</button>}
                                                 {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
                                             </div>
@@ -1529,6 +1873,10 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
 };
 
 export default function App() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isSurveyRoute = urlParams.get('survey') === 'true';
+    const surveyServiceId = urlParams.get('serviceId');
+
     const [user, setUser] = useState(null); 
     const [activeTab, setActiveTab] = useState('kanban'); 
     const isOnline = useOnlineStatus();
@@ -1536,11 +1884,11 @@ export default function App() {
     const [tecnicosData, setTecnicosData] = useState([]);
     const [vehiculosData, setVehiculosData] = useState([]);
     const [maintenanceRecords, setMaintenanceRecords] = useState([]);
+    const [surveysData, setSurveysData] = useState([]); // Nuevo estado para encuestas
     const [lastSavedService, setLastSavedService] = useState(null);
     const [notification, setNotification] = useState(null);
     const [showMsgModal, setShowMsgModal] = useState(false);
 
-    // --- HISTORIAL PWA / NAVEGACIÓN ---
     const changeTab = (newTab) => {
         if (activeTab !== newTab) {
             window.history.pushState({ tab: newTab }, '');
@@ -1573,12 +1921,12 @@ export default function App() {
     }, [activeTab]);
 
     useEffect(() => {
-        if (user) {
+        if (user && !isSurveyRoute) {
             const initialTab = user.role === 'admin' ? 'kanban' : 'tasks';
             setActiveTab(initialTab);
             window.history.replaceState({ tab: initialTab }, '');
         }
-    }, [user]);
+    }, [user, isSurveyRoute]);
 
     useEffect(() => {
         if (!document.getElementById('leaflet-css')) {
@@ -1614,9 +1962,22 @@ export default function App() {
             const loadedMaintenance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setMaintenanceRecords(loadedMaintenance);
         });
+        const unsubscribeSurveys = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'surveys'), (snapshot) => {
+            const loadedSurveys = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setSurveysData(loadedSurveys);
+        });
 
-        return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeVehicles(); unsubscribeMaintenance(); };
+        return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeVehicles(); unsubscribeMaintenance(); unsubscribeSurveys(); };
     }, []);
+
+    if (isSurveyRoute) {
+        return (
+            <>
+                <GlobalStyles />
+                <SurveyForm serviceId={surveyServiceId} />
+            </>
+        );
+    }
 
     const showNotification = (msg, type='success') => { setNotification({msg, type}); setTimeout(()=>setNotification(null), 3000); };
 
@@ -1651,7 +2012,6 @@ export default function App() {
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
 
-    // NUEVO EFFECT 2: Escuchar evento de retroceso para cerrar modales de App
     useEffect(() => {
         const handleBack = (e) => {
             const anyOpen = isSidebarOpen || isManageTechOpen || isChangeAdminPasswordOpen || isMaintenanceModalOpen || showMsgModal || uploadingEvidenceService || loggingHoursService || closingService || reopeningService || deletingId;
@@ -2024,7 +2384,8 @@ export default function App() {
                                 {id:'vehicles', label:'Flota', icon:Truck}, 
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
                                 {id:'history', label:'Historial', icon:History},
-                                {id:'kpis', label:'KPIs', icon:BarChart2} 
+                                {id:'kpis', label:'KPIs', icon:BarChart2},
+                                {id:'surveys', label:'Encuestas', icon:ClipboardList} 
                             ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     )}
@@ -2115,11 +2476,12 @@ export default function App() {
                             {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                             {activeTab === 'kpis' && <KPIs services={services} vehiculosData={vehiculosData} />}
+                            {activeTab === 'surveys' && <SurveyDashboard surveys={surveysData} />}
                         </div>
                     ) : (
                         <div className="max-w-7xl mx-auto h-full">
                             {activeTab === 'map' && <MapDashboard services={services} />}
-                            {activeTab === 'tasks' && <TechPortal services={services} maintenanceRecords={maintenanceRecords} user={user} handleStartService={handleStartService} onMaintenanceStatusChange={handleMaintenanceStatusChange} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} />}
+                            {activeTab === 'tasks' && <TechPortal services={services} maintenanceRecords={maintenanceRecords} user={user} handleStartService={handleStartService} onMaintenanceStatusChange={handleMaintenanceStatusChange} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} showNotification={showNotification} />}
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                         </div>
                     )}

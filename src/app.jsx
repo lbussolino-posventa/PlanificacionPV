@@ -7,7 +7,7 @@ import {
   Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download
+  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { initializeApp } from 'firebase/app';
@@ -55,10 +55,166 @@ const formatDate = (dateStr) => {
     return dateStr;
 };
 
+// NOTA: Pega aquí todo tu array original de PRELOADED_LOCATIONS completo. Lo comprimí para que el código entre entero.
 const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
-  // ... resto de ubicaciones originales mantenidas por brevedad
+  { lat: -31.4647, lng: -64.3575, popupContent: '<b>Malagueño, Córdoba</b>' },
+  { lat: -12.0464, lng: -77.0428, popupContent: '<b>Lima, Perú</b>' },
+  { lat: -3.7319, lng: -38.5267, popupContent: '<b>Fortaleza, Brasil</b>' },
+  { lat: -28.0652, lng: -67.5644, popupContent: '<b>Tinogasta, Catamarca</b>' },
+  { lat: -45.8641, lng: -67.4965, popupContent: '<b>Comodoro Rivadavia, Chubut</b>' },
+  { lat: -38.9516, lng: -68.0591, popupContent: '<b>Neuquén, Neuquén</b>' },
+  { lat: -34.0833, lng: -59.0333, popupContent: '<b>Zárate, Buenos Aires</b>' },
+  { lat: -23.4005, lng: -66.3672, popupContent: '<b>Susques, Jujuy</b>' },
+  { lat: -30.2333, lng: -68.7500, popupContent: '<b>Jáchal, San Juan</b>' },
+  { lat: -34.8584, lng: -57.9084, popupContent: '<b>Ensenada, Buenos Aires</b>' },
+  { lat: -31.4201, lng: -64.1888, popupContent: '<b>Córdoba, Córdoba</b>' },
+  { lat: -31.6804, lng: -63.8821, popupContent: '<b>Pilar, Córdoba</b>' },
+  { lat: -32.7231, lng: -71.4158, popupContent: '<b>Puchuncaví, Chile</b>' },
+  { lat: -33.1235, lng: -64.3499, popupContent: '<b>Río Cuarto, Córdoba</b>' },
+  { lat: -27.2721, lng: -62.2345, popupContent: '<b>Otumpa, Santiago del Estero</b>' },
+  { lat: -38.7196, lng: -62.2724, popupContent: '<b>Bahía Blanca, Buenos Aires</b>' },
+  { lat: -41.1335, lng: -71.3103, popupContent: '<b>Bariloche, Río Negro</b>' },
+  { lat: -28.0267, lng: -56.0272, popupContent: '<b>Virasoro, Corrientes</b>' },
+  { lat: -46.5895, lng: -70.9309, popupContent: '<b>Perito Moreno, Santa Cruz</b>' },
+  { lat: -34.6118, lng: -58.7656, popupContent: '<b>Trujui, Buenos Aires</b>' },
+  { lat: -31.6389, lng: -68.9600, popupContent: '<b>Punta Negra, San Juan</b>' },
+  { lat: -32.1800, lng: -64.4167, popupContent: '<b>Embalse, Córdoba</b>' },
+  { lat: -30.9333, lng: -69.6000, popupContent: '<b>Tocota, San Juan</b>' },
+  { lat: -34.7069, lng: -58.3100, popupContent: '<b>Bernal, Buenos Aires</b>' },
+  { lat: -42.7692, lng: -65.0245, popupContent: '<b>Puerto Madryn, Chubut</b>' },
+  { lat: -38.8386, lng: -61.8594, popupContent: '<b>Bajo Hondo, Buenos Aires</b>' },
+  { lat: -32.1764, lng: -64.1132, popupContent: '<b>Río Tercero, Córdoba</b>' },
+  { lat: -37.3217, lng: -59.1332, popupContent: '<b>Tandil, Buenos Aires</b>' },
+  { lat: -39.8142, lng: -73.2459, popupContent: '<b>Valdivia, Chile</b>' },
+  { lat: -32.6284, lng: -62.6868, popupContent: '<b>Bell Ville, Córdoba</b>' },
+  { lat: -46.5458, lng: -71.6277, popupContent: '<b>Los Antiguos, Santa Cruz</b>' },
+  { lat: -39.7554, lng: -65.7362, popupContent: '<b>El Solito, Río Negro</b>' },
+  { lat: -37.9833, lng: -60.1000, popupContent: '<b>Adolfo Gonzales Chaves, Buenos Aires</b>' },
+  { lat: -24.7859, lng: -65.0453, popupContent: '<b>Güemes, Salta</b>' },
+  { lat: -28.4696, lng: -65.7852, popupContent: '<b>Catamarca, Catamarca</b>' },
+  { lat: -34.8167, lng: -58.5167, popupContent: '<b>Ezeiza, Buenos Aires</b>' },
+  { lat: -37.9500, lng: -68.8500, popupContent: '<b>Rincón de los Sauces, Neuquén</b>' },
+  { lat: -34.1167, lng: -63.3667, popupContent: '<b>Laboulaye, Córdoba</b>' },
+  { lat: -39.4333, lng: -66.2167, popupContent: '<b>Pomona, Río Negro</b>' },
+  { lat: -33.2867, lng: -60.5847, popupContent: '<b>Arroyo Seco, Santa Fe</b>' },
+  { lat: -31.7319, lng: -60.5238, popupContent: '<b>Paraná, Entre Ríos</b>' },
+  { lat: -34.1633, lng: -58.9592, popupContent: '<b>Campana, Buenos Aires</b>' },
+  { lat: -29.9833, lng: -64.3500, popupContent: '<b>Villa de María, Córdoba</b>' },
+  { lat: -34.1833, lng: -70.3333, popupContent: '<b>El Teniente (Maitenes), Chile</b>' },
+  { lat: -25.2637, lng: -57.5759, popupContent: '<b>Asunción, Paraguay</b>' },
+  { lat: -38.9960, lng: -64.2591, popupContent: '<b>Río Colorado, Río Negro</b>' },
+  { lat: -36.8889, lng: -60.3225, popupContent: '<b>Olavarría, Buenos Aires</b>' },
+  { lat: -25.4667, lng: -57.5500, popupContent: '<b>Ypané, Paraguay</b>' },
+  { lat: -39.1167, lng: -65.2667, popupContent: '<b>Pichi Mahuida, Río Negro</b>' },
+  { lat: -22.9068, lng: -43.1729, popupContent: '<b>Río de Janeiro, Brasil</b>' },
+  { lat: -34.0617, lng: -60.1022, popupContent: '<b>Arrecifes, Buenos Aires</b>' },
+  { lat: -22.4694, lng: -43.8250, popupContent: '<b>Barra do Piraí, Brasil</b>' },
+  { lat: -23.5936, lng: -49.8339, popupContent: '<b>Siqueira Campos, Brasil</b>' },
+  { lat: -26.4170, lng: -54.6167, popupContent: '<b>Eldorado, Misiones</b>' },
+  { lat: -27.3671, lng: -55.8961, popupContent: '<b>Posadas, Misiones</b>' },
+  { lat: -27.5954, lng: -48.5480, popupContent: '<b>Florianópolis (Santa Catarina), Brasil</b>' },
+  { lat: -25.0950, lng: -50.1614, popupContent: '<b>Ponta Grossa, Brasil</b>' },
+  { lat: -34.9011, lng: -56.1645, popupContent: '<b>Montevideo, Uruguay</b>' },
+  { lat: -31.3927, lng: -58.0209, popupContent: '<b>Concordia, Entre Ríos</b>' },
+  { lat: -31.0036, lng: -57.8969, popupContent: '<b>Federación, Entre Ríos</b>' },
+  { lat: -27.4853, lng: -55.1199, popupContent: '<b>Oberá, Misiones</b>' },
+  { lat: -28.5524, lng: -56.0422, popupContent: '<b>Santo Tomé, Corrientes</b>' },
+  { lat: -27.5833, lng: -56.6833, popupContent: '<b>Ituzaingó, Corrientes</b>' },
+  { lat: -29.1441, lng: -59.6465, popupContent: '<b>Reconquista, Santa Fe</b>' },
+  { lat: -26.5051, lng: -61.1744, popupContent: '<b>Pampa del Infierno, Chaco</b>' },
+  { lat: -27.5739, lng: -60.7153, popupContent: '<b>Villa Ángela, Chaco</b>' },
+  { lat: -27.4514, lng: -58.9867, popupContent: '<b>Resistencia, Chaco</b>' },
+  { lat: -24.6667, lng: -65.0500, popupContent: '<b>General Güemes, Salta/Jujuy</b>' },
+  { lat: -24.2333, lng: -64.8667, popupContent: '<b>San Pedro de Jujuy, Jujuy</b>' },
+  { lat: -23.8233, lng: -64.7876, popupContent: '<b>Libertador Gral. San Martín (Ledesma), Jujuy</b>' },
+  { lat: -21.5355, lng: -64.7297, popupContent: '<b>Tarija, Bolivia</b>' },
+  { lat: -14.8586, lng: -66.7475, popupContent: '<b>San Borja, Bolivia</b>' },
+  { lat: -14.8333, lng: -64.9000, popupContent: '<b>Trinidad, Bolivia</b>' },
+  { lat: -15.1167, lng: -67.0333, popupContent: '<b>Yucumo, Bolivia</b>' },
+  { lat: -16.3700, lng: -60.9500, popupContent: '<b>San Ignacio de Velasco, Bolivia</b>' },
+  { lat: -19.5836, lng: -65.7531, popupContent: '<b>Potosí, Bolivia</b>' },
+  { lat: -33.4489, lng: -70.6693, popupContent: '<b>Santiago, Chile</b>' },
+  { lat: -32.9250, lng: -71.5167, popupContent: '<b>Concón, Chile</b>' },
+  { lat: -37.4697, lng: -72.3539, popupContent: '<b>Los Ángeles, Chile</b>' },
+  { lat: -46.4394, lng: -67.5191, popupContent: '<b>Caleta Olivia, Santa Cruz</b>' },
+  { lat: -46.5417, lng: -68.9247, popupContent: '<b>Las Heras, Santa Cruz</b>' },
+  { lat: 10.6918, lng: -61.2225, popupContent: '<b>Isla de Trinidad, Trinidad y Tobago</b>' },
+  { lat: 11.2385, lng: -60.6720, popupContent: '<b>Isla de Tobago, Trinidad y Tobago</b>' },
+  { lat: 36.1540, lng: -95.9928, popupContent: '<b>Tulsa, Estados Unidos</b>' },
+  { lat: -51.6226, lng: -69.2181, popupContent: '<b>Río Gallegos, Santa Cruz</b>' },
+  { lat: -46.5492, lng: -71.6288, popupContent: '<b>Los Antiguos, Santa Cruz</b>' },
+  { lat: -37.3875, lng: -68.9248, popupContent: '<b>Rincón de los Sauces, Neuquén</b>' },
+  { lat: -38.9026, lng: -70.0645, popupContent: '<b>Zapala, Neuquén</b>' },
+  { lat: -39.2831, lng: -65.4682, popupContent: '<b>Choele Choel, Río Negro</b>' },
+  { lat: -38.8500, lng: -60.0667, popupContent: '<b>Claromecó, Buenos Aires</b>' },
+  { lat: -34.6037, lng: -58.3816, popupContent: '<b>Buenos Aires, CABA</b>' },
+  { lat: -26.9000, lng: -61.1667, popupContent: '<b>Pampa del Infierno, Chaco</b>' },
+  { lat: -36.0151, lng: -59.0967, popupContent: '<b>Las Flores, Buenos Aires</b>' },
+  { lat: -32.3333, lng: -64.9667, popupContent: '<b>Los Molles, San Luis</b>' },
+  { lat: -36.6500, lng: -61.2667, popupContent: '<b>La Elbita, Buenos Aires</b>' },
+  { lat: -35.9833, lng: -62.7333, popupContent: '<b>Trenque Lauquen, Buenos Aires</b>' },
+  { lat: -38.5744, lng: -58.7885, popupContent: '<b>Necochea, Buenos Aires</b>' },
+  { lat: -37.1667, lng: -57.9167, popupContent: '<b>Las Armas, Buenos Aires</b>' },
+  { lat: -35.6167, lng: -69.5833, popupContent: '<b>Malargüe, Mendoza</b>' },
+  { lat: -28.3167, lng: -63.1333, popupContent: '<b>Lugones, Santiago del Estero</b>' },
+  { lat: -27.9500, lng: -63.8833, popupContent: '<b>Forres, Santiago del Estero</b>' },
+  { lat: -27.5833, lng: -60.4167, popupContent: '<b>Villa Ángela, Chaco</b>' },
+  { lat: -28.4500, lng: -63.4667, popupContent: '<b>Garza, Santiago del Estero</b>' },
+  { lat: -27.4606, lng: -58.8341, popupContent: '<b>Corrientes, Corrientes</b>' },
+  { lat: 18.4861, lng: -69.9312, popupContent: '<b>Santo Domingo, República Dominicana</b>' },
+  { lat: 18.2206, lng: -63.0686, popupContent: '<b>The Valley, Anguila</b>' },
+  { lat: 11.0200, lng: -63.9100, popupContent: '<b>Isla de Margarita, Venezuela</b>' },
+  { lat: 8.3019, lng: -62.7108, popupContent: '<b>Puerto Ordaz, Venezuela</b>' },
+  { lat: -0.1807, lng: -78.4678, popupContent: '<b>Quito, Ecuador</b>' },
+  { lat: 9.9281, lng: -84.0907, popupContent: '<b>San José, Costa Rica</b>' },
+  { lat: 12.1364, lng: -86.2514, popupContent: '<b>Managua, Nicaragua</b>' },
+  { lat: 14.5995, lng: 120.9842, popupContent: '<b>Manila, Filipinas</b>' },
+  { lat: -33.3021, lng: -66.3368, popupContent: '<b>San Luis, San Luis</b>' },
+  { lat: -31.5500, lng: -65.0167, popupContent: '<b>Villa Cura Brochero, Córdoba</b>' },
+  { lat: -34.1208, lng: -70.4358, popupContent: '<b>Sewell, Chile</b>' },
+  { lat: -23.4000, lng: -57.1667, popupContent: '<b>Horqueta, Paraguay</b>' },
+  { lat: -27.8167, lng: -64.0667, popupContent: '<b>Robles, Santiago del Estero</b>' },
+  { lat: 35.2529,  lng: -95.3486, popupContent: '<b>Eufaula Dam, Oklahoma, USA</b>' },
+  { lat: 39.7817,  lng: -89.6501, popupContent: '<b>Springfield, Illinois, USA</b>' },
+  { lat: 47.4235,  lng: -120.3103, popupContent: '<b>Wenatchee, Washington, USA</b>' },
+  { lat: 44.9778,  lng: -93.2650, popupContent: '<b>Minneapolis, Minnesota, USA</b>' },
+  { lat: 41.3459,  lng: -73.0784, popupContent: '<b>Ansonia, Connecticut, USA</b>' },
+  { lat: 36.2920,  lng: -95.6186, popupContent: '<b>Pryor Creek, Oklahoma, USA</b>' },
+  { lat: 33.4735,  lng: -82.0105, popupContent: '<b>Augusta, Georgia, USA</b>' },
+  { lat: 44.0582,  lng: -121.3153, popupContent: '<b>Bend, Oregon, USA</b>' },
+  { lat: 33.9982,  lng: -96.3378, popupContent: '<b>Durant, Oklahoma, USA</b>' },
+  { lat: 32.0232,  lng: -97.3917, popupContent: '<b>Blum, Texas, USA</b>' },
+  { lat: 8.2936,   lng: -62.7208, popupContent: '<b>Puerto Ordaz, Venezuela</b>' },
+  { lat: 13.6929,  lng: -89.2182, popupContent: '<b>San Salvador, El Salvador</b>' },
+  { lat: 25.0479,  lng: -77.3554, popupContent: '<b>Nassau, Bahamas</b>' },
+  { lat: 19.3133,  lng: -81.3875, popupContent: '<b>George Town, Cayman Islands</b>' },
+  { lat: 21.2323,  lng: -86.7303, popupContent: '<b>Isla Mujeres, Mexico</b>' },
+  { lat: -32.4075, lng: -63.2402, popupContent: '<b>Villa María, Córdoba</b>' },
+  { lat: 32.3792,  lng: -86.3077, popupContent: '<b>Montgomery, Alabama, USA</b>' },
+  { lat: 30.2980,  lng: -87.6833, popupContent: '<b>Foley, Alabama, USA</b>' },
+  { lat: 35.5398,  lng: -109.8037, popupContent: '<b>Oak Springs, Arizona, USA</b>' },
+  { lat: -25.4284, lng: -49.2733, popupContent: '<b>Curitiba, Brazil</b>' },
+  { lat: -17.7833, lng: -63.1833, popupContent: '<b>Santa Cruz de la Sierra, Bolivia</b>' },
+  { lat: -24.9140, lng: -65.4883, popupContent: '<b>Cerrillos, Salta</b>' },
+  { lat: -43.2489, lng: -65.3094, popupContent: '<b>Trelew, Chubut</b>' },
+  { lat: -31.8360, lng: -60.5165, popupContent: '<b>Oro Verde, Entre Ríos</b>' },
+  { lat: -34.5153, lng: -58.7658, popupContent: '<b>José C. Paz, Buenos Aires</b>' },
+  { lat: -32.9247, lng: -68.7972, popupContent: '<b>Luzuriaga, Mendoza</b>' },
+  { lat: -43.7667, lng: -66.4500, popupContent: '<b>Dique Florentino Ameghino, Chubut</b>' },
+  { lat: -29.4131, lng: -66.8557, popupContent: '<b>La Rioja, La Rioja, Argentina</b>' },
+  { lat: -34.9205, lng: -57.9536, popupContent: '<b>La Plata, Buenos Aires</b>' },
+  { lat: -51.3536, lng: -70.4373, popupContent: '<b>La Esperanza, Santa Cruz</b>' },
+  { lat: -39.0333, lng: -67.5833, popupContent: '<b>General Roca, Río Negro</b>' },
+  { lat: -31.8667, lng: -62.7167, popupContent: '<b>Las Varillas, Córdoba</b>' },
+  { lat: -38.2500, lng: -61.9000, popupContent: '<b>Tres Picos, Buenos Aires</b>' },
+  { lat: -34.8039, lng: -69.6053, popupContent: '<b>El Sosneado, Mendoza</b>' },
+  { lat: -26.8329, lng: -65.1664, popupContent: '<b>Banda del Río Salí, Tucumán</b>' },
+  { lat: -26.9167, lng: -65.3333, popupContent: '<b>Lules, Tucumán</b>' },
+  { lat: -38.9333, lng: -69.2333, popupContent: '<b>Cutral Có, Neuquén</b>' },
+  { lat: -46.5895, lng: -70.9309, popupContent: '<b>Perito Moreno, Santa Cruz</b>' },
+  { lat: -53.7883, lng: -67.7032, popupContent: '<b>Río Grande, Tierra del Fuego</b>' }
 ];
 
 const extractCoordinates = (str) => {
@@ -85,159 +241,38 @@ const useOnlineStatus = () => {
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    
-    body { 
-        font-family: 'Inter', sans-serif; 
-        background-color: #020617; 
-        color: #f8fafc; 
-        letter-spacing: 0.01em;
-    }
-
-    .app-background { 
-        background-image: url('${BACKGROUND_IMAGE}'); 
-        background-size: cover; 
-        background-position: center; 
-        background-repeat: no-repeat; 
-    }
-    .app-overlay { 
-        background-color: rgba(2, 6, 23, 0.60) !important; 
-        backdrop-filter: blur(1px) !important; 
-    }
-
-    .bg-white, .bg-slate-50, .bg-slate-100, .bg-white\\/95, .bg-white\\/90, .bg-white\\/50 {
-        background-color: rgba(15, 23, 42, 0.65) !important; 
-        border-color: rgba(255, 255, 255, 0.08) !important;
-        backdrop-filter: blur(8px) !important;
-    }
-
-    .fixed.z-\\[100\\] .bg-white, .fixed.z-\\[100\\] .bg-slate-50, .fixed.z-\\[100\\] .bg-slate-100 {
-        background-color: #0f172a !important; 
-        backdrop-filter: none !important;
-    }
-
-    h1, h2, h3, h4, h5, label, p, span {
-        text-shadow: 0 1px 2px rgba(0,0,0,0.3); 
-    }
-    .text-slate-800, .text-slate-700 { color: #ffffff !important; font-weight: 600; }
-    .text-slate-600 { color: #e2e8f0 !important; }
-    .text-slate-500, .text-slate-400 { color: #94a3b8 !important; }
-
-    .input-field, 
-    input[type="text"], input[type="password"], input[type="email"], 
-    input[type="date"], input[type="time"], input[type="number"], 
-    select, textarea {
-        background-color: #ffffff !important;
-        color: #b34505ce !important; 
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 0.75rem !important; 
-        padding: 0.75rem 1rem !important; 
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
-        outline: none !important;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05) !important;
-        width: 100% !important;
-    }
-    .input-field:focus, input:focus, select:focus, textarea:focus {
-        border-color: #f97316 !important;
-        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2) !important;
-    }
-    .input-field::placeholder, input::placeholder, textarea::placeholder {
-        color: #94a3b8 !important;
-        font-weight: 400 !important;
-        text-shadow: none !important;
-    }
-
-    .kanban-card { 
-        background-color: rgba(30, 41, 59, 0.85) !important; 
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 1rem !important;
-        color: #ffffff !important;
-        transition: transform 0.2s, box-shadow 0.2s; 
-        cursor: grab; 
-    }
-    .kanban-card:active { 
-        transform: scale(1.02); 
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); 
-    }
-
-    .btn-bubble-container {
-        display: flex;
-        background-color: rgba(15, 23, 42, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 9999px;
-        padding: 0.35rem;
-        margin: 0 auto 1.5rem auto;
-        width: fit-content;
-    }
-    .btn-bubble {
-        padding: 0.5rem 1.5rem;
-        border-radius: 9999px;
-        font-size: 0.85rem;
-        font-weight: 700;
-        transition: all 0.3s ease;
-        text-transform: uppercase;
-        border: none;
-        cursor: pointer;
-    }
-    .btn-bubble-inactive {
-        background-color: transparent !important;
-        color: #94a3b8 !important;
-    }
-    .btn-bubble-active {
-        background-color: #ea580c !important; 
-        color: #ffffff !important;
-        box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4) !important;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
-    
-    .leaflet-container { font-family: 'Inter', sans-serif; z-index: 0; }
-    .animate-in { animation: fadeIn 0.3s ease-out forwards; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    .survey-container {
-        background-color: #f0ebf8 !important; 
-        color: #202124 !important;
-        min-height: 100vh;
-    }
-    .survey-container h1, .survey-container h2, .survey-container h3, .survey-container label, .survey-container p, .survey-container span {
-        text-shadow: none !important;
-        color: #202124 !important;
-    }
-    .survey-card {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 1px solid #dadce0 !important;
-        border-top: 10px solid #673ab7 !important; 
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
-    }
-    .survey-card-inner {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 1px solid #dadce0 !important;
-        box-shadow: none !important;
-    }
-    .survey-input {
-        background-color: transparent !important;
-        border: none !important;
-        border-bottom: 1px solid #dadce0 !important;
-        border-radius: 0 !important;
-        padding: 8px 0 !important;
-        box-shadow: none !important;
-        color: #202124 !important;
-    }
-    .survey-input:focus {
-        border-bottom: 2px solid #673ab7 !important;
-        box-shadow: none !important;
-    }
-    .survey-radio-group input[type="radio"] {
-        accent-color: #673ab7 !important;
-        width: 20px;
-        height: 20px;
-    }
+    body{font-family:'Inter',sans-serif;background-color:#020617;color:#f8fafc;letter-spacing:0.01em;}
+    .app-background{background-image:url('${BACKGROUND_IMAGE}');background-size:cover;background-position:center;background-repeat:no-repeat;}
+    .app-overlay{background-color:rgba(2,6,23,0.60)!important;backdrop-filter:blur(1px)!important;}
+    .bg-white,.bg-slate-50,.bg-slate-100,.bg-white\\/95,.bg-white\\/90,.bg-white\\/50{background-color:rgba(15,23,42,0.65)!important;border-color:rgba(255,255,255,0.08)!important;backdrop-filter:blur(8px)!important;}
+    .fixed.z-\\[100\\] .bg-white,.fixed.z-\\[100\\] .bg-slate-50,.fixed.z-\\[100\\] .bg-slate-100{background-color:#0f172a!important;backdrop-filter:none!important;}
+    h1,h2,h3,h4,h5,label,p,span{text-shadow:0 1px 2px rgba(0,0,0,0.3);}
+    .text-slate-800,.text-slate-700{color:#ffffff!important;font-weight:600;}
+    .text-slate-600{color:#e2e8f0!important;}
+    .text-slate-500,.text-slate-400{color:#94a3b8!important;}
+    .input-field,input[type="text"],input[type="password"],input[type="email"],input[type="date"],input[type="time"],input[type="number"],select,textarea{background-color:#ffffff!important;color:#b34505ce!important;border:1px solid #cbd5e1!important;border-radius:0.75rem!important;padding:0.75rem 1rem!important;font-size:0.9rem!important;font-weight:500!important;outline:none!important;box-shadow:inset 0 2px 4px rgba(0,0,0,0.05)!important;width:100%!important;}
+    .input-field:focus,input:focus,select:focus,textarea:focus{border-color:#f97316!important;box-shadow:0 0 0 3px rgba(249,115,22,0.2)!important;}
+    .input-field::placeholder,input::placeholder,textarea::placeholder{color:#94a3b8!important;font-weight:400!important;text-shadow:none!important;}
+    .kanban-card{background-color:rgba(30,41,59,0.85)!important;border:1px solid rgba(255,255,255,0.1)!important;border-radius:1rem!important;color:#ffffff!important;transition:transform 0.2s,box-shadow 0.2s;cursor:grab;}
+    .kanban-card:active{transform:scale(1.02);box-shadow:0 10px 15px -3px rgba(0,0,0,0.5);}
+    .btn-bubble-container{display:flex;background-color:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:9999px;padding:0.35rem;margin:0 auto 1.5rem auto;width:fit-content;}
+    .btn-bubble{padding:0.5rem 1.5rem;border-radius:9999px;font-size:0.85rem;font-weight:700;transition:all 0.3s ease;text-transform:uppercase;border:none;cursor:pointer;}
+    .btn-bubble-inactive{background-color:transparent!important;color:#94a3b8!important;}
+    .btn-bubble-active{background-color:#ea580c!important;color:#ffffff!important;box-shadow:0 4px 12px rgba(234,88,12,0.4)!important;}
+    .custom-scrollbar::-webkit-scrollbar{width:6px;height:6px;}
+    .custom-scrollbar::-webkit-scrollbar-track{background:transparent;}
+    .custom-scrollbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:10px;}
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.3);}
+    .leaflet-container{font-family:'Inter',sans-serif;z-index:0;}
+    .animate-in{animation:fadeIn 0.3s ease-out forwards;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+    .survey-container{background-color:#f0ebf8!important;color:#202124!important;min-height:100vh;}
+    .survey-container h1,.survey-container h2,.survey-container h3,.survey-container label,.survey-container p,.survey-container span{text-shadow:none!important;color:#202124!important;}
+    .survey-card{background-color:#ffffff!important;border-radius:8px!important;border:1px solid #dadce0!important;border-top:10px solid #673ab7!important;box-shadow:0 1px 4px rgba(0,0,0,0.1)!important;}
+    .survey-card-inner{background-color:#ffffff!important;border-radius:8px!important;border:1px solid #dadce0!important;box-shadow:none!important;}
+    .survey-input{background-color:transparent!important;border:none!important;border-bottom:1px solid #dadce0!important;border-radius:0!important;padding:8px 0!important;box-shadow:none!important;color:#202124!important;}
+    .survey-input:focus{border-bottom:2px solid #673ab7!important;box-shadow:none!important;}
+    .survey-radio-group input[type="radio"]{accent-color:#673ab7!important;width:20px;height:20px;}
   `}</style>
 );
 
@@ -383,12 +418,18 @@ const SurveyForm = ({ serviceId }) => {
     );
 };
 
-// ==========================================
-// DASHBOARD DE ENCUESTAS MODIFICADO
-// ==========================================
 const SurveyDashboard = ({ surveys }) => {
     const [filterYear, setFilterYear] = useState('all');
     const [selectedSurveyModal, setSelectedSurveyModal] = useState(null);
+
+    const availableYears = useMemo(() => {
+        const years = new Set();
+        (surveys || []).forEach(s => {
+            if (s.timestamp) years.add(new Date(s.timestamp).getFullYear());
+        });
+        const yearsArray = Array.from(years).sort((a, b) => b - a);
+        return yearsArray.length > 0 ? yearsArray : [new Date().getFullYear()];
+    }, [surveys]);
 
     const filteredSurveys = useMemo(() => {
         if (!surveys) return [];
@@ -455,7 +496,18 @@ const SurveyDashboard = ({ surveys }) => {
         URL.revokeObjectURL(url);
     };
 
-    // Calcular promedios globales
+    const handleDeleteSurvey = async (e, surveyId) => {
+        e.stopPropagation();
+        if (window.confirm('¿Seguro que deseas eliminar esta encuesta permanentemente?')) {
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'surveys', surveyId));
+            } catch (error) {
+                console.error("Error eliminando encuesta", error);
+                alert("Error al eliminar la encuesta.");
+            }
+        }
+    };
+
     const averages = useMemo(() => {
         if (!filteredSurveys || filteredSurveys.length === 0) return null;
         const sums = { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0, q7: 0, q8: 0 };
@@ -484,7 +536,6 @@ const SurveyDashboard = ({ surveys }) => {
         return { data: result, global: globalAvg.toFixed(1) };
     }, [filteredSurveys]);
 
-    // Data para gráficos Donut (Por Pregunta)
     const getDonutDataForQuestion = (qKey) => {
         const counts = { '5 Puntos':0, '4 Puntos':0, '3 Puntos':0, '2 Puntos':0, '1 Punto':0 };
         filteredSurveys.forEach(s => {
@@ -498,7 +549,6 @@ const SurveyDashboard = ({ surveys }) => {
         return Object.keys(counts).filter(k=>counts[k]>0).map(k => ({ name: k, value: counts[k] }));
     };
 
-    // Data para gráfico "Tipo de Trabajo"
     const getTipoTrabajoData = () => {
         const counts = {};
         filteredSurveys.forEach(s => {
@@ -508,7 +558,6 @@ const SurveyDashboard = ({ surveys }) => {
         return Object.keys(counts).map(k => ({ name: k, value: counts[k] }));
     };
 
-    // Data para gráfico "Lead Time"
     const getLeadTimeData = () => {
         const buckets = { "0 A 10 Dias": 0, "11 A 20 Dias": 0, "21 A 30 Dias": 0, "+30 Dias": 0 };
         filteredSurveys.forEach(s => {
@@ -528,7 +577,6 @@ const SurveyDashboard = ({ surveys }) => {
 
     return (
         <div className="space-y-6 animate-in fade-in pb-10">
-            {/* Header / Filtro */}
             <div className="flex flex-col md:flex-row items-center justify-between bg-white/95 p-5 rounded-2xl border border-slate-100 shadow-sm backdrop-blur-sm sticky top-0 z-20">
                 <div className="flex items-center gap-3 mb-4 md:mb-0">
                     <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600"><ClipboardList className="w-5 h-5" /></div>
@@ -539,7 +587,7 @@ const SurveyDashboard = ({ surveys }) => {
                         <div className="flex items-center px-3 text-slate-500 text-xs font-bold uppercase tracking-wider"><Filter className="w-3.5 h-3.5 mr-2"/> Año</div>
                         <select className="bg-white border border-slate-200 rounded-lg text-sm py-1.5 px-3 outline-none" value={filterYear} onChange={e=>setFilterYear(e.target.value)}>
                             <option value="all">Todos los Años</option>
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
                     <button onClick={handleExportExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl shadow-md text-sm transition-colors flex items-center">
@@ -555,7 +603,6 @@ const SurveyDashboard = ({ surveys }) => {
                 </div>
             ) : (
                 <>
-                    {/* Fila 1: Global y Radar */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
                             <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
@@ -579,7 +626,6 @@ const SurveyDashboard = ({ surveys }) => {
                         </div>
                     </div>
 
-                    {/* Fila 2: Lead Time y Distribución de Trabajos */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-80 flex flex-col">
                             <h4 className="font-bold text-slate-800 text-sm mb-2">Distribucion de Trabajos por Categoria</h4>
@@ -611,7 +657,6 @@ const SurveyDashboard = ({ surveys }) => {
                         </div>
                     </div>
 
-                    {/* Fila 3: KPIs de 8 Preguntas */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {surveyQuestionsData.map((q, idx) => {
                             const data = getDonutDataForQuestion(q.id);
@@ -634,7 +679,6 @@ const SurveyDashboard = ({ surveys }) => {
                         })}
                     </div>
 
-                    {/* Tabla de Respuestas con Apertura de Modal */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <h3 className="font-bold text-slate-700 text-sm flex items-center"><MessageSquare className="w-4 h-4 mr-2 text-indigo-500"/> Respuestas Individuales</h3>
@@ -648,13 +692,14 @@ const SurveyDashboard = ({ surveys }) => {
                                         <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-[10px]">Servicio</th>
                                         <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase tracking-wider text-[10px]">Promedio</th>
                                         <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-[10px]">Motivo / Comentario Principal</th>
+                                        <th className="px-6 py-4 text-right font-bold text-slate-500 uppercase tracking-wider text-[10px]">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
                                     {filteredSurveys.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((s, i) => {
                                         const avg = (Object.values(s.ratings||{}).reduce((a,b)=>a+Number(b),0) / 8).toFixed(1);
                                         return (
-                                            <tr key={i} onClick={() => setSelectedSurveyModal(s)} className="hover:bg-indigo-50/50 transition-colors cursor-pointer group">
+                                            <tr key={s.id || i} onClick={() => setSelectedSurveyModal(s)} className="hover:bg-indigo-50/50 transition-colors cursor-pointer group">
                                                 <td className="px-6 py-4">
                                                     <div className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{s.empresa}</div>
                                                     <div className="text-xs text-slate-500">{formatDate(s.fechaAsistencia)} • {s.nombreCompleto}</div>
@@ -668,6 +713,15 @@ const SurveyDashboard = ({ surveys }) => {
                                                 <td className="px-6 py-4 text-xs text-slate-600 max-w-xs truncate" title={s.motivo}>
                                                     <span className="font-bold text-slate-400">Motivo:</span> {s.motivo}
                                                 </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <button 
+                                                        onClick={(e) => handleDeleteSurvey(e, s.id)} 
+                                                        className="text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded transition-colors"
+                                                        title="Eliminar encuesta"
+                                                    >
+                                                        <Trash2 className="w-4 h-4"/>
+                                                    </button>
+                                                </td>
                                             </tr>
                                         );
                                     })}
@@ -678,7 +732,6 @@ const SurveyDashboard = ({ surveys }) => {
                 </>
             )}
 
-            {/* Modal para ver detalles completos de la encuesta */}
             <Modal isOpen={!!selectedSurveyModal} onClose={() => setSelectedSurveyModal(null)} title="Detalle de Respuesta de Encuesta" size="lg">
                 {selectedSurveyModal && (
                     <div className="space-y-6">
@@ -721,10 +774,6 @@ const SurveyDashboard = ({ surveys }) => {
         </div>
     );
 };
-
-// ==========================================
-// COMPONENTES EXISTENTES MANTENIDOS
-// ==========================================
 
 const FileUploader = ({ files, setFiles, label, required = false }) => {
   const fileInputRef = useRef(null);
@@ -1125,6 +1174,15 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
     const [kpiMonth, setKpiMonth] = useState('all');
     const [selectedVehicleKpi, setSelectedVehicleKpi] = useState('');
 
+    const availableYears = useMemo(() => {
+        const years = new Set();
+        (services || []).forEach(s => {
+            if (s.fInicio) years.add(new Date(s.fInicio).getFullYear());
+        });
+        const yearsArray = Array.from(years).sort((a, b) => b - a);
+        return yearsArray.length > 0 ? yearsArray : [new Date().getFullYear()];
+    }, [services]);
+
     const filteredServices = services.filter(s => { 
         if (!s.fInicio) return false;
         const sDate = new Date(s.fInicio); 
@@ -1239,7 +1297,7 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
         { name: 'Rest', value: 100 - gaugePercentage, fill: '#f1f5f9' }
     ];
 
-    if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
+    if (servicesForCalc.length === 0) return (<div className="space-y-6 animate-in fade-in pb-10"><div className="flex items-center gap-4 bg-white/90 p-4 rounded-2xl border border-slate-100 shadow-sm mb-6 backdrop-blur-sm"><div className="flex items-center text-slate-500 text-sm font-bold"><Filter className="w-4 h-4 mr-2"/> Filtrar Periodo:</div><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Todos los Años</option>{availableYears.map(y => <option key={y} value={y}>{y}</option>)}</select><select className="bg-slate-50 border-none rounded-lg text-sm p-2 focus:ring-2 focus:ring-orange-100 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Todos los Meses</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select></div><div className="p-10 text-center text-slate-400 bg-white/50 rounded-xl">Sin datos operativos en el periodo seleccionado.</div></div>);
     
     const totalServices = servicesForCalc.length;
     const closedServices = servicesForCalc.filter(s => s.estado === 'Finalizado' || s.estado === 'No Finalizado');
@@ -1278,7 +1336,10 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
                 <div className="flex items-center gap-3 mb-4 md:mb-0"><div className="bg-orange-50 p-2 rounded-lg text-orange-600"><BarChart2 className="w-5 h-5" /></div><div><h3 className="text-lg font-bold text-slate-800">Panel de Control</h3><p className="text-xs text-slate-400 font-medium">Indicadores clave de rendimiento</p></div></div>
                 <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
                     <div className="flex items-center px-3 text-slate-500 text-xs font-bold uppercase tracking-wider"><Filter className="w-3.5 h-3.5 mr-2"/> Periodo</div>
-                    <select className="bg-white border border-slate-200 rounded-lg text-sm py-1.5 px-3 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}><option value="all">Año: Todos</option>{[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select>
+                    <select className="bg-white border border-slate-200 rounded-lg text-sm py-1.5 px-3 outline-none" value={kpiYear} onChange={e=>setKpiYear(e.target.value)}>
+                        <option value="all">Año: Todos</option>
+                        {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
                     <select className="bg-white border border-slate-200 rounded-lg text-sm py-1.5 px-3 outline-none" value={kpiMonth} onChange={e=>setKpiMonth(e.target.value)}><option value="all">Mes: Todos</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i) => <option key={i} value={i.toString()}>{m}</option>)}</select>
                 </div>
             </div>
@@ -1357,7 +1418,7 @@ const KPIs = ({ services, maintenanceRecords = [], vehiculosData = [] }) => {
                 </div>
 
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
-                    <div className="flex justify-between items-center mb-6 relative z-10"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><PieChart className="w-4 h-4 mr-2 text-orange-500"/> Distribución Horaria</h4><p className="text-[10px] text-slate-400 font-medium">Horas Totales (Productivas vs Viaje)</p></div></div>
+                    <div className="flex justify-between items-center mb-6 relative z-10"><div><h4 className="font-bold text-slate-800 text-sm flex items-center mb-1"><PieChartIcon className="w-4 h-4 mr-2 text-orange-500"/> Distribución Horaria</h4><p className="text-[10px] text-slate-400 font-medium">Horas Totales (Productivas vs Viaje)</p></div></div>
                     <div className="h-64 relative z-10">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>

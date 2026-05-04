@@ -7,8 +7,7 @@ import {
   Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon,
-  Percent, Shield, FileSpreadsheet, Folder, Loader2
+  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { initializeApp } from 'firebase/app';
@@ -47,9 +46,6 @@ const COLORS_TRABAJO = {
   "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Estudios Médicos": "#f43f5e", "Otro": "#94a3b8"
 };
 
-// Validamos qué trabajos requieren ensayos
-const REQUIRES_TESTS_TYPES = ["Montaje de Transformador", "Supervisión de Montaje", "Servicio de Mantenimiento", "Ensayos Eléctricos (Únicamente)"];
-
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -59,8 +55,7 @@ const formatDate = (dateStr) => {
     return dateStr;
 };
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
+// NOTA: Pega aquí todo tu array original de PRELOADED_LOCATIONS completo. Lo comprimí para que el código entre entero.
 const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
@@ -283,629 +278,20 @@ const GlobalStyles = () => (
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
-  const sizeClasses = size === 'full' ? 'w-full h-full max-w-none max-h-none rounded-none' : size === 'lg' ? 'max-w-4xl' : size === 'xl' ? 'max-w-6xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
+  const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-0 md:p-4 backdrop-blur-sm transition-all">
-      <div className={`bg-white shadow-2xl w-full ${sizeClasses} overflow-hidden animate-in flex flex-col ${size === 'full' ? '' : 'rounded-2xl max-h-[90vh]'}`}>
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${sizeClasses} overflow-hidden animate-in flex flex-col max-h-[90vh]`}>
+        <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
           <h3 className="text-lg font-bold text-slate-800">{title}</h3>
           <button type="button" onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">{children}</div>
+        <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
       </div>
     </div>
   );
 };
 
-// ============================================================================
-// MODULO DE ENSAYOS (PLANILLA)
-// ============================================================================
-
-const TestSheetEditor = ({ testData, onSave, onBack }) => {
-  const [activeTab, setActiveTab] = useState('ttr');
-  const [tapRange, setTapRange] = useState(testData.tapRange || 5);
-  const [data, setData] = useState(testData.data || {});
-  const [tgDeltaData, setTgDeltaData] = useState(testData.tgDeltaData || [
-    { id: generateId() }, { id: generateId() }, { id: generateId() }, { id: generateId() }
-  ]);
-  const [insulationData, setInsulationData] = useState(testData.insulationData ||
-    Array(6).fill(null).map(() => ({ id: generateId() }))
-  );
-  const [headerInfo, setHeaderInfo] = useState(testData.headerInfo || {
-    manufacturingNumber: '', serialNumber: '', client: '', date: new Date().toISOString().split('T')[0]
-  });
-  const [resistanceSettings, setResistanceSettings] = useState(testData.resistanceSettings || {
-    measuredTemp: '20', refTemp: '75', conn1Name: 'Conexión 1', conn2Name: 'Conexión 2', conn3Name: 'Conexión 3'
-  });
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setIsSaving(true);
-    const updatedTest = {
-      ...testData,
-      tapRange, data, tgDeltaData, insulationData, headerInfo, resistanceSettings,
-      lastModified: new Date().toISOString()
-    };
-    const timeoutId = setTimeout(() => {
-      onSave(updatedTest).then(() => setIsSaving(false));
-    }, 1500); 
-    return () => clearTimeout(timeoutId);
-  }, [tapRange, data, tgDeltaData, insulationData, headerInfo, resistanceSettings]);
-
-  useEffect(() => {
-    const loadScript = (src) => {
-      if (document.querySelector(`script[src="${src}"]`)) return;
-      const script = document.createElement('script');
-      script.src = src; script.async = true;
-      document.body.appendChild(script);
-    };
-    loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
-    loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
-  }, []);
-
-  const tapRows = useMemo(() => {
-    const rows = [];
-    for (let i = tapRange; i >= 1; i--) rows.push({ id: `pos-${i}`, label: `+${i}` });
-    rows.push({ id: 'neutral', label: '0 (Nominal)' });
-    for (let i = 1; i <= tapRange; i++) rows.push({ id: `neg-${i}`, label: `-${i}` });
-    return rows;
-  }, [tapRange]);
-
-  const handleInputChange = (id, field, value) => {
-    const valWithComma = value.replace('.', ',');
-    setData(prev => ({ ...prev, [id]: { ...prev[id], [field]: valWithComma } }));
-  };
-
-  const handleTgDeltaChange = (id, field, value) => {
-    const valFormatted = (field === 'testVoltage' || field === 'tgPercent' || field === 'capacitance')
-      ? value.replace('.', ',') : value;
-    setTgDeltaData(prev => prev.map(row => row.id === id ? { ...row, [field]: valFormatted } : row));
-  };
-  const addTgDeltaRow = () => setTgDeltaData(prev => [...prev, { id: generateId() }]);
-  const removeTgDeltaRow = (id) => { if (confirm('¿Borrar fila?')) setTgDeltaData(prev => prev.filter(row => row.id !== id)); };
-
-  const handleInsulationChange = (id, field, value) => {
-    const numericFields = ['val30s', 'val1m', 'val2m', 'val3m', 'val4m', 'val5m', 'val6m', 'val7m', 'val8m', 'val9m', 'val10m'];
-    const valFormatted = numericFields.includes(field) ? value.replace('.', ',') : value;
-    setInsulationData(prev => prev.map(row => row.id === id ? { ...row, [field]: valFormatted } : row));
-  };
-  const addInsulationRow = () => setInsulationData(prev => [...prev, { id: generateId() }]);
-  const removeInsulationRow = (id) => { if (confirm('¿Borrar fila?')) setInsulationData(prev => prev.filter(row => row.id !== id)); };
-
-  const parseNum = (val) => val ? parseFloat(String(val).replace(',', '.')) : 0;
-  const formatNum = (val, decimals = 3) => (val === null || val === undefined || isNaN(val)) ? '-' : val.toFixed(decimals).replace('.', ',');
-
-  const calculateDeviation = (measured, rated) => {
-    const m = parseNum(measured); const r = parseNum(rated);
-    if (isNaN(m) || isNaN(r) || r === 0) return null;
-    return ((m - r) / r) * 100;
-  };
-
-  const calculateResistanceCorrection = (measuredVal) => {
-    const m = parseNum(measuredVal);
-    const t_meas = parseNum(resistanceSettings.measuredTemp);
-    const t_ref = parseNum(resistanceSettings.refTemp);
-    if (isNaN(m) || isNaN(t_meas) || isNaN(t_ref)) return null;
-    return m * ((235 + t_ref) / (235 + t_meas));
-  };
-
-  const calculateDAR = (val1m, val30s) => {
-    const v1 = parseNum(val1m); const v30 = parseNum(val30s);
-    if (v30 === 0 || isNaN(v1) || isNaN(v30)) return null;
-    return v1 / v30;
-  };
-  const calculatePI = (val10m, val1m) => {
-    const v10 = parseNum(val10m); const v1 = parseNum(val1m);
-    if (v1 === 0 || isNaN(v10) || isNaN(v1)) return null;
-    return v10 / v1;
-  };
-
-  const getStatusTTR = (deviation) => {
-    if (deviation === null) return { color: 'bg-gray-50 text-gray-400 print:text-gray-400', icon: null };
-    const absDev = Math.abs(deviation);
-    if (absDev <= 0.5) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" /> };
-    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" /> };
-  };
-
-  const getStatusTG = (valStr) => {
-    if (!valStr) return { color: 'bg-white', icon: null };
-    const val = parseNum(valStr);
-    if (val < 0.5) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" /> };
-    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" /> };
-  };
-
-  const getStatusIP = (piValue) => {
-    if (piValue === null) return { color: 'bg-white', icon: null, label: '-' };
-    if (piValue > 1.0) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" />, label: 'ACEPTABLE' };
-    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" />, label: 'NO ACEPTABLE' };
-  };
-
-  const handleDownloadExcel = () => {
-    if (!window.XLSX) return alert("Cargando librería Excel...");
-    const wb = window.XLSX.utils.book_new();
-    const ttrData = [
-      ["PLANILLA DE ENSAYOS - TTR"],
-      ["Cliente:", headerInfo.client, "Fecha:", headerInfo.date],
-      ["Nº Serie:", headerInfo.serialNumber, "Nº Fab:", headerInfo.manufacturingNumber],
-      [], ["Tap", "Ratio %", "Rated Ratio", "Ph A Meas", "Dev A %", "Ph B Meas", "Dev B %", "Ph C Meas", "Dev C %"]
-    ];
-    tapRows.forEach(row => {
-      const d = data[row.id] || {};
-      const devA = calculateDeviation(d.phaseA, d.ratedRatio);
-      const devB = calculateDeviation(d.phaseB, d.ratedRatio);
-      const devC = calculateDeviation(d.phaseC, d.ratedRatio);
-      ttrData.push([row.label, d.ratioPercent, d.ratedRatio, d.phaseA, devA !== null ? formatNum(devA) : "", d.phaseB, devB !== null ? formatNum(devB) : "", d.phaseC, devC !== null ? formatNum(devC) : ""]);
-    });
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(ttrData), "TTR");
-
-    const resData = [
-      ["PLANILLA DE ENSAYOS - RESISTENCIA"],
-      [], ["Tap", `${resistanceSettings.conn1Name} (Meas)`, `${resistanceSettings.conn1Name} (Corr)`, `${resistanceSettings.conn2Name} (Meas)`, `${resistanceSettings.conn2Name} (Corr)`, `${resistanceSettings.conn3Name} (Meas)`, `${resistanceSettings.conn3Name} (Corr)`]
-    ];
-    tapRows.forEach(row => {
-      const d = data[row.id] || {};
-      const c1 = calculateResistanceCorrection(d.resConn1Meas); const c2 = calculateResistanceCorrection(d.resConn2Meas); const c3 = calculateResistanceCorrection(d.resConn3Meas);
-      resData.push([row.label, d.resConn1Meas, c1 !== null ? formatNum(c1, 4) : "", d.resConn2Meas, c2 !== null ? formatNum(c2, 4) : "", d.resConn3Meas, c3 !== null ? formatNum(c3, 4) : ""]);
-    });
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(resData), "Resistencia");
-
-    const tgData = [
-      ["PLANILLA DE ENSAYOS - TANGENTE DELTA"],
-      [], ["Modo", "Inyección", "Medición", "Guarda", "Tensión Ensayo", "TG (%)", "Cx (pF)"]
-    ];
-    tgDeltaData.forEach(row => tgData.push([row.mode, row.injection, row.measurement, row.guard, row.testVoltage, row.tgPercent, row.capacitance]));
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(tgData), "TG Delta");
-
-    const insData = [
-      ["PLANILLA DE ENSAYOS - RESISTENCIA DE AISLACIÓN (GΩ)"],
-      [], ["Inyección", "Medición", "Guarda", "30\"", "1'", "2'", "3'", "4'", "5'", "6'", "7'", "8'", "9'", "10'", "RAD (DAR)", "IP (PI)", "Estado IP"]
-    ];
-    insulationData.forEach(row => {
-      const dar = calculateDAR(row.val1m, row.val30s); const pi = calculatePI(row.val10m, row.val1m); const statusIP = getStatusIP(pi);
-      insData.push([row.injection, row.measurement, row.guard, row.val30s, row.val1m, row.val2m, row.val3m, row.val4m, row.val5m, row.val6m, row.val7m, row.val8m, row.val9m, row.val10m, dar !== null ? formatNum(dar, 2) : "", pi !== null ? formatNum(pi, 2) : "", statusIP.label]);
-    });
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(insData), "Aislación");
-
-    window.XLSX.writeFile(wb, `Ensayo_${headerInfo.serialNumber || 'SN'}.xlsx`);
-  };
-
-  const handleDownloadPDF = () => {
-    const element = document.getElementById('printable-content');
-    if (!window.html2pdf) return alert("Cargando librería PDF...");
-    document.body.classList.add('generating-pdf');
-    const opt = { margin: 5, filename: `Ensayo_${headerInfo.serialNumber || 'SN'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
-    window.html2pdf().set(opt).from(element).save().then(() => document.body.classList.remove('generating-pdf'));
-  };
-
-  return (
-    <div className="animate-in fade-in duration-300 w-full bg-white rounded-xl shadow-inner border border-slate-200">
-      <style>{`
-        @media print { @page { size: landscape; margin: 10mm; } .no-print { display: none !important; } .print-border { border: 1px solid #000 !important; } }
-        body.generating-pdf input, body.generating-pdf select { border: none !important; background: transparent !important; padding: 0 !important; text-align: center; appearance: none; }
-        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        .ensayo-input { border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; width: 100%; padding: 4px; font-size: 12px; }
-        .ensayo-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-      `}</style>
-
-      <div className="bg-slate-800 text-white p-3 flex items-center justify-between rounded-t-xl sticky top-0 z-50 no-print" data-html2canvas-ignore="true">
-        <div className="flex items-center gap-4">
-          {onBack && (
-            <button onClick={onBack} className="flex items-center gap-2 hover:bg-slate-700 px-3 py-1.5 rounded transition font-bold text-sm">
-              <ArrowLeft size={16} /> Volver a Ensayos
-            </button>
-          )}
-          <div className="h-6 w-px bg-slate-600"></div>
-          <div>
-            <h2 className="font-bold text-sm">{headerInfo.client || 'Sin Cliente'}</h2>
-            <p className="text-xs text-slate-400">SN: {headerInfo.serialNumber || '---'}</p>
-          </div>
-        </div>
-        <div className="flex gap-2 items-center">
-          {isSaving ? (
-            <span className="text-xs text-amber-400 flex items-center gap-1 font-bold"><Loader2 size={14} className="animate-spin" /> Guardando...</span>
-          ) : (
-            <span className="text-xs text-emerald-400 flex items-center gap-1 font-bold"><Cloud size={14} /> Guardado</span>
-          )}
-        </div>
-      </div>
-
-      <div id="printable-content" className="max-w-[1400px] mx-auto p-4 bg-slate-50 min-h-[70vh] print:bg-white print:p-0 rounded-b-xl text-slate-800">
-        <header className="bg-white shadow-sm rounded-lg p-5 mb-4 border-l-4 border-blue-600 print:shadow-none print:border-none print:mb-2 print:p-0">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="w-full">
-              <h1 className="text-xl font-bold text-slate-800 print:text-black mb-1">Planilla de Ensayos Eléctricos</h1>
-              <p className="text-slate-500 print:text-slate-700 mb-4 text-xs uppercase tracking-wide font-bold">
-                {activeTab === 'ttr' ? 'Relación de Transformación (TTR)' : activeTab === 'resistance' ? 'Resistencia de Devanados' : activeTab === 'tgdelta' ? 'Factor de Potencia / TG Delta' : 'Resistencia de Aislación'}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-white print:border-black print:border-2 print:p-2 text-sm">
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nº Fabricación</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold uppercase text-xs" value={headerInfo.manufacturingNumber} onChange={(e) => setHeaderInfo({ ...headerInfo, manufacturingNumber: e.target.value })} /></div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nº Serie</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold uppercase text-xs" value={headerInfo.serialNumber} onChange={(e) => setHeaderInfo({ ...headerInfo, serialNumber: e.target.value })} /></div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cliente / Proyecto</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded uppercase text-xs font-medium" value={headerInfo.client} onChange={(e) => setHeaderInfo({ ...headerInfo, client: e.target.value })} /></div>
-                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fecha</label><input type="date" className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs font-medium" value={headerInfo.date} onChange={(e) => setHeaderInfo({ ...headerInfo, date: e.target.value })} /></div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 no-print min-w-[160px]" data-html2canvas-ignore="true">
-              <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow text-xs uppercase font-bold tracking-wide w-full justify-center"><Download size={16} /> Exportar PDF</button>
-              <button onClick={handleDownloadExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow text-xs uppercase font-bold tracking-wide w-full justify-center"><FileSpreadsheet size={16} /> Exportar Excel</button>
-            </div>
-          </div>
-        </header>
-
-        <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200 mb-4 no-print flex flex-wrap items-center gap-4" data-html2canvas-ignore="true">
-          {(activeTab === 'ttr' || activeTab === 'resistance') && (
-            <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Taps (+/-)</label>
-                <select value={tapRange} onChange={(e) => setTapRange(parseInt(e.target.value))} className="block w-24 border-slate-300 rounded border p-1 text-xs bg-slate-50 font-bold">
-                  {[...Array(17).keys()].map(num => <option key={num} value={num}>+/- {num}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-          <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto">
-            <button onClick={() => setActiveTab('ttr')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'ttr' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Zap size={14} /> TTR</button>
-            <button onClick={() => setActiveTab('resistance')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'resistance' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Activity size={14} /> Resistencia</button>
-            <button onClick={() => setActiveTab('tgdelta')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'tgdelta' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Percent size={14} /> TG Delta</button>
-            <button onClick={() => setActiveTab('insulation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'insulation' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Shield size={14} /> Aislación</button>
-          </div>
-        </div>
-
-        {activeTab === 'ttr' && (
-          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
-                    <th colSpan="3" className="py-2 px-2 border-r border-slate-600 print:border-black text-center font-bold text-[10px] uppercase">Referencia</th>
-                    <th colSpan="6" className="py-2 px-2 text-center font-bold bg-blue-900 print:bg-slate-300 print:text-black text-[10px] uppercase">Mediciones (3 Fases)</th>
-                  </tr>
-                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
-                    <th className="py-2 px-1 w-12 border-r border-slate-300 print:border-black">Tap</th>
-                    <th className="py-2 px-1 w-20 border-r border-slate-300 print:border-black">Ratio %</th>
-                    <th className="py-2 px-1 w-24 border-r border-slate-400 print:border-black bg-amber-50 print:bg-white">Teórico</th>
-                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase A</th>
-                    <th className="py-2 px-1 w-16 border-r border-slate-300 print:border-black bg-blue-50 print:bg-white">Dev A</th>
-                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase B</th>
-                    <th className="py-2 px-1 w-16 border-r border-slate-300 print:border-black bg-blue-50 print:bg-white">Dev B</th>
-                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase C</th>
-                    <th className="py-2 px-1 w-16 bg-blue-50 print:bg-white">Dev C</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tapRows.map((row, index) => {
-                    const rowData = data[row.id] || {};
-                    const devA = calculateDeviation(rowData.phaseA, rowData.ratedRatio);
-                    const devB = calculateDeviation(rowData.phaseB, rowData.ratedRatio);
-                    const devC = calculateDeviation(rowData.phaseC, rowData.ratedRatio);
-                    const statusA = getStatusTTR(devA); const statusB = getStatusTTR(devB); const statusC = getStatusTTR(devC);
-                    return (
-                      <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200 print:border-slate-300`}>
-                        <td className="py-1 px-2 border-r border-slate-300 print:border-black text-center font-bold text-slate-700">{row.label}</td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input" value={rowData.ratioPercent || ''} onChange={(e) => handleInputChange(row.id, 'ratioPercent', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-amber-50/50 print:bg-white"><input type="text" inputMode="decimal" className="ensayo-input font-bold" value={rowData.ratedRatio || ''} onChange={(e) => handleInputChange(row.id, 'ratedRatio', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseA || ''} onChange={(e) => handleInputChange(row.id, 'phaseA', e.target.value)} /></td>
-                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${statusA.color} print:border text-[10px]`}>{statusA.icon} {devA !== null ? formatNum(devA) : '-'}%</td>
-                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseB || ''} onChange={(e) => handleInputChange(row.id, 'phaseB', e.target.value)} /></td>
-                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${statusB.color} print:border text-[10px]`}>{statusB.icon} {devB !== null ? formatNum(devB) : '-'}%</td>
-                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseC || ''} onChange={(e) => handleInputChange(row.id, 'phaseC', e.target.value)} /></td>
-                        <td className={`py-1 px-1 text-center ${statusC.color} print:border text-[10px]`}>{statusC.icon} {devC !== null ? formatNum(devC) : '-'}%</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'resistance' && (
-          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
-            <div className="bg-purple-50 p-2 border-b border-purple-200 grid grid-cols-1 md:grid-cols-2 gap-4 print:bg-white print:border-black print:border-b-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase text-purple-900">Temp. Observada:</span>
-                <input type="text" inputMode="decimal" value={resistanceSettings.measuredTemp} onChange={(e) => setResistanceSettings({ ...resistanceSettings, measuredTemp: e.target.value.replace('.', ',') })} className="w-16 p-1 border border-purple-300 rounded text-center font-bold text-xs" />
-                <span className="text-xs text-purple-800 font-bold">°C</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase text-purple-900">Temp. Referencia:</span>
-                <input type="text" inputMode="decimal" value={resistanceSettings.refTemp} onChange={(e) => setResistanceSettings({ ...resistanceSettings, refTemp: e.target.value.replace('.', ',') })} className="w-16 p-1 border border-purple-300 rounded text-center font-bold text-xs" />
-                <span className="text-xs text-purple-800 font-bold">°C</span>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse text-xs">
-                <thead>
-                  <tr className="bg-purple-900 text-white print:bg-slate-300 print:text-black border-b print:border-black">
-                    <th className="py-2 px-2 border-r border-purple-700 print:border-black w-16 text-[10px]">POS</th>
-                    <th colSpan="2" className="py-1 px-2 border-r border-purple-700 print:border-black text-center"><input type="text" value={resistanceSettings.conn1Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn1Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 1" /></th>
-                    <th colSpan="2" className="py-1 px-2 border-r border-purple-700 print:border-black text-center"><input type="text" value={resistanceSettings.conn2Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn2Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 2" /></th>
-                    <th colSpan="2" className="py-1 px-2 text-center"><input type="text" value={resistanceSettings.conn3Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn3Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 3" /></th>
-                  </tr>
-                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
-                    <th className="py-2 px-1 border-r border-slate-300 print:border-black">Tap</th>
-                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
-                    <th className="py-1 px-1 w-32 border-r border-slate-400 print:border-black bg-purple-50 print:bg-white">Corregido</th>
-                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
-                    <th className="py-1 px-1 w-32 border-r border-slate-400 print:border-black bg-purple-50 print:bg-white">Corregido</th>
-                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
-                    <th className="py-1 px-1 w-32 bg-purple-50 print:bg-white">Corregido</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tapRows.map((row, index) => {
-                    const rowData = data[row.id] || {};
-                    const c1 = calculateResistanceCorrection(rowData.resConn1Meas); const c2 = calculateResistanceCorrection(rowData.resConn2Meas); const c3 = calculateResistanceCorrection(rowData.resConn3Meas);
-                    return (
-                      <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200 print:border-slate-300`}>
-                        <td className="py-1 px-2 border-r border-slate-300 print:border-black text-center font-bold text-slate-700">{row.label}</td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn1Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn1Meas', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c1 !== null ? formatNum(c1, 4) : '-'}</td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn2Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn2Meas', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c2 !== null ? formatNum(c2, 4) : '-'}</td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn3Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn3Meas', e.target.value)} /></td>
-                        <td className="py-1 px-1 bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c3 !== null ? formatNum(c3, 4) : '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'tgdelta' && (
-          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] border-collapse text-xs">
-                <thead>
-                  <tr className="bg-orange-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
-                    <th rowSpan="2" className="py-2 px-3 border-r border-orange-700 print:border-black w-24 text-[10px]">MODO</th>
-                    <th colSpan="3" className="py-1 px-2 border-r border-orange-700 print:border-black text-center bg-orange-900 print:bg-slate-400 text-[10px]">CONEXIONES</th>
-                    <th rowSpan="2" className="py-2 px-2 border-r border-orange-700 print:border-black w-32 text-[10px]">TENSIÓN</th>
-                    <th rowSpan="2" className="py-2 px-2 border-r border-orange-700 print:border-black w-32 text-[10px]">TG (%)</th>
-                    <th rowSpan="2" className="py-2 px-2 w-32 text-[10px]">Cx (pF)</th>
-                    <th rowSpan="2" className="py-2 px-1 w-10 no-print"></th>
-                  </tr>
-                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
-                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-24">INYECCIÓN</th>
-                    <th className="py-1 px-1 border-r border-slate-300 print:border-black">MEDICIÓN</th>
-                    <th className="py-1 px-1 border-r border-slate-300 print:border-black">GUARDA</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tgDeltaData.map((row) => {
-                    const status = getStatusTG(row.tgPercent);
-                    return (
-                      <tr key={row.id} className="bg-white border-b border-slate-200 print:border-slate-300">
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black">
-                          <select value={row.mode || ''} onChange={(e) => handleTgDeltaChange(row.id, 'mode', e.target.value)} className="ensayo-input border-none font-bold text-slate-700">
-                            <option value="">-</option><option value="UST">UST</option><option value="GST g">GST g</option><option value="GST-GND">GST-GND</option>
-                          </select>
-                        </td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black">
-                          <select value={row.injection || ''} onChange={(e) => handleTgDeltaChange(row.id, 'injection', e.target.value)} className="ensayo-input border-none font-medium">
-                            <option value="">-</option><option value="AT">AT</option><option value="MT">MT</option><option value="BT">BT</option>
-                          </select>
-                        </td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none" value={row.measurement || ''} onChange={(e) => handleTgDeltaChange(row.id, 'measurement', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none" value={row.guard || ''} onChange={(e) => handleTgDeltaChange(row.id, 'guard', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none font-bold" value={row.testVoltage || ''} onChange={(e) => handleTgDeltaChange(row.id, 'testVoltage', e.target.value)} /></td>
-                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${status.color} print:border`}><div className="flex items-center justify-center gap-1">{status.icon}<input type="text" inputMode="decimal" className="w-16 p-1 border-none bg-transparent text-center font-bold focus:outline-none text-xs" placeholder="%" value={row.tgPercent || ''} onChange={(e) => handleTgDeltaChange(row.id, 'tgPercent', e.target.value)} /></div></td>
-                        <td className="py-1 px-1 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none" placeholder="pF" value={row.capacitance || ''} onChange={(e) => handleTgDeltaChange(row.id, 'capacitance', e.target.value)} /></td>
-                        <td className="py-1 px-1 text-center no-print"><button onClick={() => removeTgDeltaRow(row.id)} className="text-slate-300 hover:text-rose-500 transition"><X size={14} /></button></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 print:bg-white text-[10px] text-slate-500 flex justify-between items-center font-medium">
-              <span>* TG aceptable &lt; 0,5%</span>
-              <button onClick={addTgDeltaRow} className="flex items-center gap-1 text-orange-600 font-bold hover:text-orange-800 no-print"><Plus size={14} /> Fila</button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'insulation' && (
-          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] border-collapse text-xs">
-                <thead>
-                  <tr className="bg-teal-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
-                    <th colSpan="3" className="py-1 px-2 border-r border-teal-700 print:border-black text-center bg-teal-900 print:bg-slate-400 text-[10px]">CONEXIÓN</th>
-                    <th colSpan="11" className="py-1 px-2 border-r border-teal-700 print:border-black text-center text-[10px]">RESULTADOS (GΩ)</th>
-                    <th colSpan="3" className="py-1 px-2 border-r border-teal-700 print:border-black text-center bg-teal-900 print:bg-slate-400 text-[10px]">ÍNDICES</th>
-                    <th rowSpan="2" className="py-1 px-1 w-8 no-print"></th>
-                  </tr>
-                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
-                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">INY</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">MED</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">GDA</th>
-                    {['30"',"1'","2'","3'","4'","5'","6'","7'","8'","9'","10'"].map(t=><th key={t} className="py-1 px-1 border-r border-slate-300 print:border-black w-10">{t}</th>)}
-                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-12 bg-amber-50 print:bg-white">RAD</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-12 bg-amber-50 print:bg-white">IP</th><th className="py-1 px-1 w-24 bg-slate-50 print:bg-white">Estado IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {insulationData.map((row) => {
-                    const dar = calculateDAR(row.val1m, row.val30s); const pi = calculatePI(row.val10m, row.val1m); const statusIP = getStatusIP(pi);
-                    return (
-                      <tr key={row.id} className="bg-white border-b border-slate-200 print:border-slate-300">
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><select value={row.injection || ''} onChange={(e) => handleInsulationChange(row.id, 'injection', e.target.value)} className="ensayo-input border-none font-bold text-[10px]"><option value="">-</option><option value="AT">AT</option><option value="MT">MT</option><option value="BT">BT</option></select></td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none text-[10px]" value={row.measurement || ''} onChange={(e) => handleInsulationChange(row.id, 'measurement', e.target.value)} /></td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none text-[10px]" value={row.guard || ''} onChange={(e) => handleInsulationChange(row.id, 'guard', e.target.value)} /></td>
-                        {['val30s','val1m','val2m','val3m','val4m','val5m','val6m','val7m','val8m','val9m','val10m'].map(f=>(<td key={f} className="py-1 px-0.5 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none text-[10px] p-0" value={row[f] || ''} onChange={(e) => handleInsulationChange(row.id, f, e.target.value)} /></td>))}
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black bg-amber-50/50 text-center font-bold text-[10px] text-blue-800">{dar !== null ? formatNum(dar, 2) : '-'}</td>
-                        <td className="py-1 px-1 border-r border-slate-300 print:border-black bg-amber-50/50 text-center font-bold text-[10px] text-blue-800">{pi !== null ? formatNum(pi, 2) : '-'}</td>
-                        <td className={`py-1 px-1 text-center font-bold text-[9px] uppercase ${statusIP.color} print:border-black print:border`}><div className="flex items-center justify-center gap-1">{statusIP.icon}<span>{statusIP.label}</span></div></td>
-                        <td className="py-1 px-1 text-center no-print"><button onClick={() => removeInsulationRow(row.id)} className="text-slate-300 hover:text-rose-500 transition"><X size={12} /></button></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 print:bg-white text-[10px] text-slate-500 flex justify-between items-center font-medium">
-              <span>* IP Aceptable &gt; 1.0</span>
-              <button onClick={addInsulationRow} className="flex items-center gap-1 text-teal-600 font-bold hover:text-teal-800 no-print"><Plus size={14} /> Fila</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Componente intermediario para listar/crear ensayos de un servicio
-const ServiceTestsManager = ({ service, onUpdateService, onClose }) => {
-  const [activeTest, setActiveTest] = useState(null);
-  const maxTrafos = service.cantidadTrafos || 1;
-  const tests = service.ensayos || [];
-
-  const handleSaveTest = async (updatedTest) => {
-    let newTests = [...tests];
-    const index = newTests.findIndex(t => t.id === updatedTest.id);
-    if (index >= 0) newTests[index] = updatedTest;
-    else newTests.push(updatedTest);
-    
-    await onUpdateService({ ensayos: newTests });
-  };
-
-  const handleCreateTest = () => {
-    if (tests.length >= maxTrafos) {
-      alert("Ya se alcanzó la cantidad máxima de transformadores configurada para este servicio.");
-      return;
-    }
-    const newTest = {
-      id: generateId(), lastModified: new Date().toISOString(), tapRange: 5,
-      headerInfo: { manufacturingNumber: service.trafoFabricacion||'', serialNumber: service.trafoSerie||'', client: service.cliente||'', date: new Date().toISOString().split('T')[0] },
-      data: {}, resistanceSettings: { measuredTemp: '20', refTemp: '75', conn1Name: 'Conexión 1', conn2Name: 'Conexión 2', conn3Name: 'Conexión 3' },
-      tgDeltaData: Array(4).fill(null).map(() => ({ id: generateId() })),
-      insulationData: Array(6).fill(null).map(() => ({ id: generateId() }))
-    };
-    setActiveTest(newTest);
-  };
-
-  const handleDeleteTest = async (testId, e) => {
-    e.stopPropagation();
-    if (window.confirm("¿Seguro que deseas eliminar esta planilla?")) {
-      const newTests = tests.filter(t => t.id !== testId);
-      await onUpdateService({ ensayos: newTests });
-    }
-  };
-
-  if (activeTest) {
-    return <TestSheetEditor testData={activeTest} onSave={handleSaveTest} onBack={() => setActiveTest(null)} />;
-  }
-
-  return (
-    <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto py-4">
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h3 className="font-bold text-lg text-slate-800 flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2 text-teal-600"/> Ensayos del Servicio</h3>
-          <p className="text-xs text-slate-500 mt-1">Transformadores ensayados: <b>{tests.length} de {maxTrafos}</b> permitidos.</p>
-        </div>
-        {tests.length < maxTrafos && (
-          <button onClick={handleCreateTest} className="bg-teal-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-teal-700 transition flex items-center text-sm shadow-md active:scale-95">
-            <Plus className="w-4 h-4 mr-1"/> Nueva Planilla
-          </button>
-        )}
-      </div>
-
-      {tests.length === 0 ? (
-        <div className="text-center p-12 text-slate-400 italic bg-white/50 rounded-xl border border-dashed border-slate-200">
-          Aún no se han cargado planillas de ensayo para este servicio.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tests.map(t => (
-            <div key={t.id} onClick={() => setActiveTest(t)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 cursor-pointer hover:border-teal-400 hover:shadow-md transition-all group relative">
-              <div className="flex justify-between items-start mb-3">
-                <span className="text-[10px] font-bold bg-teal-50 text-teal-700 px-2 py-1 rounded uppercase tracking-wider">Planilla TTR/Res/TG/Aisl</span>
-                <button onClick={(e) => handleDeleteTest(t.id, e)} className="text-slate-300 hover:text-rose-500 transition-colors p-1"><Trash2 className="w-4 h-4"/></button>
-              </div>
-              <h4 className="font-black text-slate-800 text-lg leading-tight mb-1">SN: {t.headerInfo.serialNumber || 'Sin especificar'}</h4>
-              <p className="text-xs text-slate-500 mb-3">Fabricación: {t.headerInfo.manufacturingNumber || '-'}</p>
-              <div className="flex items-center text-[10px] text-slate-400 font-medium">
-                <Clock className="w-3 h-3 mr-1"/> Modificado: {new Date(t.lastModified).toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Panel global de ensayos para Administrador
-const EnsayosDashboard = ({ services }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const allTests = useMemo(() => {
-    return services.flatMap(s => (s.ensayos || []).map(t => ({
-      ...t, 
-      serviceId: s.id, 
-      serviceOci: s.oci, 
-      serviceCliente: s.cliente,
-      serviceDate: s.fInicio
-    }))).sort((a,b) => new Date(b.lastModified) - new Date(a.lastModified));
-  }, [services]);
-
-  const filteredTests = allTests.filter(t => 
-    (t.headerInfo.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.serviceCliente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.serviceOci || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6 animate-in fade-in h-full flex flex-col">
-      <div className="bg-white/95 p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-sm shrink-0">
-        <div>
-            <h3 className="text-lg font-bold flex items-center text-slate-800"><FileSpreadsheet className="w-5 h-5 mr-3 text-teal-600"/> Base de Datos de Ensayos</h3>
-            <p className="text-xs text-slate-500 font-medium mt-1">Registro global de planillas eléctricas</p>
-        </div>
-        <div className="flex w-full md:w-auto flex-1 max-w-md relative">
-            <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400"/>
-            <input type="text" placeholder="Buscar por Cliente, OCI o Serie..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-teal-100 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto flex-1 custom-scrollbar">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-slate-50 sticky top-0 z-10">
-                    <tr>
-                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Cliente / OCI</th>
-                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Transformador</th>
-                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Fecha Servicio</th>
-                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Última Modificación</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                    {filteredTests.map((t, idx) => (
-                        <tr key={`${t.id}-${idx}`} className="hover:bg-teal-50/30 transition-colors">
-                            <td className="px-6 py-4">
-                                <div className="font-bold text-slate-800">{t.serviceCliente}</div>
-                                <div className="text-xs font-mono text-slate-500">OCI: {t.serviceOci}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                                <div className="font-bold text-slate-700">SN: {t.headerInfo.serialNumber || 'S/N'}</div>
-                                <div className="text-[10px] text-slate-500">FAB: {t.headerInfo.manufacturingNumber || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 text-slate-600 font-medium">{formatDate(t.serviceDate)}</td>
-                            <td className="px-6 py-4 text-xs text-slate-500">{new Date(t.lastModified).toLocaleString()}</td>
-                        </tr>
-                    ))}
-                    {filteredTests.length === 0 && <tr><td colSpan="4" className="text-center py-12 text-slate-400 italic">No se encontraron ensayos.</td></tr>}
-                </tbody>
-            </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-// ============================================================================
-
-
-// ... (CÓDIGO ANTERIOR DE ENCUESTAS, DASHBOARDS, MAPA, KANBAN, ETC.) ...
-// (Se mantienen igual que en tu código original)
 const surveyQuestionsData = [
     { id: 'q1', title: '1. Califique la atención que el servicio de post venta le brindo previo a iniciar los trabajos.', obsLabel: 'Observaciones (Atención previa)' },
     { id: 'q2', title: '2. Califique la coordinación y cumplimiento en la ejecución de los trabajos en sitio.', obsLabel: 'Observaciones (Coordinación y ejecución)' },
@@ -2165,18 +1551,11 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
 
 const TransformerHistory = ({ services }) => {
     const [searchSerial, setSearchSerial] = useState("");
-    const [managingTestsService, setManagingTestsService] = useState(null);
-
     const history = useMemo(() => { 
         if (!searchSerial) return []; 
         return services.filter(s => (s.trafoSerie && s.trafoSerie.toLowerCase().includes(searchSerial.toLowerCase())) || (s.trafoFabricacion && s.trafoFabricacion.toLowerCase().includes(searchSerial.toLowerCase()))); 
     }, [searchSerial, services]);
     const displayHistory = searchSerial ? history : services.sort((a,b) => new Date(b.fInicio) - new Date(a.fInicio)).slice(0, 5);
-
-    const handleUpdateServiceTests = async (testUpdates) => {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingTestsService.id), testUpdates);
-        setManagingTestsService(prev => ({...prev, ...testUpdates}));
-    };
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -2202,15 +1581,6 @@ const TransformerHistory = ({ services }) => {
                                 <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {formatDate(srv.fInicio)}</span>
                                 <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
                             </div>
-                            
-                            {srv.ensayos && srv.ensayos.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-slate-200">
-                                    <button onClick={() => setManagingTestsService(srv)} className="flex items-center text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors">
-                                        <FileSpreadsheet className="w-4 h-4 mr-2"/> Ver Ensayos Eléctricos ({srv.ensayos.length})
-                                    </button>
-                                </div>
-                            )}
-
                             <TechReportViewer service={srv} />
                         </div>
                     ))}
@@ -2218,10 +1588,6 @@ const TransformerHistory = ({ services }) => {
             ) : (
                 <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No se encontraron servicios con ese número de serie o fabricación.</div>
             )}
-
-            <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Gestión de Ensayos" size="xl">
-                {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
-            </Modal>
         </div>
     );
 };
@@ -2230,14 +1596,10 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
     const [view, setView] = useState('list'); 
     const [hideCompleted, setHideCompleted] = useState(false);
     const [previewService, setPreviewService] = useState(null);
-    const [managingTestsService, setManagingTestsService] = useState(null);
 
     useEffect(() => {
         const handleBack = (e) => {
-            if (managingTestsService) {
-                e.preventDefault();
-                setManagingTestsService(null);
-            } else if (previewService) {
+            if (previewService) {
                 e.preventDefault(); 
                 setPreviewService(null); 
             } else if (view === 'gantt') {
@@ -2248,7 +1610,7 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
 
         window.addEventListener('app-back', handleBack);
         return () => window.removeEventListener('app-back', handleBack);
-    }, [previewService, view, managingTestsService]);
+    }, [previewService, view]);
 
     const myServices = useMemo(() => {
         let list = services.filter(s => s.tecnicos && s.tecnicos.includes(user.name));
@@ -2269,12 +1631,6 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
         const link = `${window.location.origin}${window.location.pathname}?survey=true&serviceId=${serviceId}`;
         navigator.clipboard.writeText(link);
         showNotification("Link de encuesta copiado al portapapeles", "success");
-    };
-
-    const handleUpdateServiceTests = async (testUpdates) => {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingTestsService.id), testUpdates);
-        setManagingTestsService(prev => ({...prev, ...testUpdates}));
-        showNotification("Ensayos actualizados");
     };
 
     return (
@@ -2336,9 +1692,7 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                             <div>
                                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
                                 <div className="grid grid-cols-1 gap-5">
-                                    {myServices.map(srv => {
-                                        const requiresTests = REQUIRES_TESTS_TYPES.includes(srv.tipoTrabajo);
-                                        return (
+                                    {myServices.map(srv => (
                                         <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow group/card">
                                             <div className="flex-1 cursor-pointer" onClick={() => setPreviewService(srv)}>
                                                 <div className="flex items-center gap-3 mb-3">
@@ -2376,9 +1730,6 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                     <>
                                                         <button onClick={(e) => handleShareSurvey(e, srv.id)} className="bg-emerald-50 text-emerald-700 border border-emerald-200 py-2 px-3 rounded-lg font-bold hover:bg-emerald-100 flex items-center justify-center text-xs transition-colors shadow-sm"><Share2 className="w-4 h-4 mr-2"/> Encuesta a Cliente</button>
                                                         <button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button>
-                                                        {requiresTests && (
-                                                            <button onClick={() => setManagingTestsService(srv)} className="bg-white text-teal-600 border border-teal-200 py-2 px-3 rounded-lg font-bold hover:bg-teal-50 flex items-center justify-center text-xs transition-colors"><FileSpreadsheet className="w-4 h-4 mr-2"/> Cargar Ensayos</button>
-                                                        )}
                                                         <button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button>
                                                     </>
                                                 )}
@@ -2386,7 +1737,7 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                 {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
                                             </div>
                                         </div>
-                                    )})}
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -2503,11 +1854,6 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                     </div>
                 )}
             </Modal>
-            
-            {/* Modal Especial para Ensayos */}
-            <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Gestión de Ensayos" size="xl">
-                {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
-            </Modal>
         </div>
     );
 };
@@ -2597,9 +1943,6 @@ export default function App() {
     const [notification, setNotification] = useState(null);
     const [showMsgModal, setShowMsgModal] = useState(false);
 
-    // Estado para gestionar qué servicio está abriendo sus ensayos
-    const [managingTestsService, setManagingTestsService] = useState(null);
-
     const changeTab = (newTab) => {
         if (activeTab !== newTab) {
             window.history.pushState({ tab: newTab }, '');
@@ -2681,12 +2024,22 @@ export default function App() {
         return () => { unsubscribeServices(); unsubscribeTechnicians(); unsubscribeVehicles(); unsubscribeMaintenance(); unsubscribeSurveys(); };
     }, []);
 
+    if (isSurveyRoute) {
+        return (
+            <>
+                <GlobalStyles />
+                <SurveyForm serviceId={surveyServiceId} />
+            </>
+        );
+    }
+
     const showNotification = (msg, type='success') => { setNotification({msg, type}); setTimeout(()=>setNotification(null), 3000); };
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isManageTechOpen, setIsManageTechOpen] = useState(false);
     const [manageTab, setManageTab] = useState('techs');
     const [isChangeAdminPasswordOpen, setIsChangeAdminPasswordOpen] = useState(false); 
+    
     const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
     const [editingMaintenanceId, setEditingMaintenanceId] = useState(null);
     const [maintenanceFormData, setMaintenanceFormData] = useState({
@@ -2694,12 +2047,12 @@ export default function App() {
         fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: ''
     });
 
+    const [newAdminPasswordToChange, setNewAdminPasswordToChange] = useState(""); 
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
         tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-        progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: '',
-        cantidadTrafos: 1
+        progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
     });
 
     const [uploadingEvidenceService, setUploadingEvidenceService] = useState(null);
@@ -2713,13 +2066,119 @@ export default function App() {
     const [reopenReason, setReopenReason] = useState("");
     const [deletingId, setDeletingId] = useState(null);
 
+    useEffect(() => {
+        const handleBack = (e) => {
+            const anyOpen = isSidebarOpen || isManageTechOpen || isChangeAdminPasswordOpen || isMaintenanceModalOpen || showMsgModal || uploadingEvidenceService || loggingHoursService || closingService || reopeningService || deletingId;
+            
+            if (anyOpen) {
+                e.preventDefault(); 
+                setIsSidebarOpen(false); setIsManageTechOpen(false); setIsChangeAdminPasswordOpen(false); setIsMaintenanceModalOpen(false); setShowMsgModal(false); setUploadingEvidenceService(null); setLoggingHoursService(null); setClosingService(null); setReopeningService(null); setDeletingId(null);
+            }
+        };
+        window.addEventListener('app-back', handleBack);
+        return () => window.removeEventListener('app-back', handleBack);
+    }, [isSidebarOpen, isManageTechOpen, isChangeAdminPasswordOpen, isMaintenanceModalOpen, showMsgModal, uploadingEvidenceService, loggingHoursService, closingService, reopeningService, deletingId]);
+    
+    const [newTechName, setNewTechName] = useState("");
+    const [newTechPhone, setNewTechPhone] = useState("");
+    const [newTechEmail, setNewTechEmail] = useState("");
+    const [newTechPassword, setNewTechPassword] = useState("");
+    
+    const [newVehicleName, setNewVehicleName] = useState("");
+
     const resetForm = () => {
         setEditingId(null);
         setFormData({
             oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
             tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-            progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: '', cantidadTrafos: 1
+            progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
         });
+    };
+
+    const addTechnician = async () => {
+        if (newTechName && !tecnicosData.find(t => t.name === newTechName.toUpperCase())) {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'technicians'), { name: newTechName.toUpperCase(), phone: newTechPhone, email: newTechEmail, password: newTechPassword || "1234" });
+            setNewTechName(""); setNewTechPhone(""); setNewTechEmail(""); setNewTechPassword(""); showNotification("Técnico agregado");
+        }
+    };
+    const removeTechnician = async (id, name) => { if(window.confirm(`¿Eliminar a ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id)); };
+    const updateTechData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'technicians', id), { [field]: value }); };
+
+    const addVehicle = async () => {
+        if (newVehicleName && !vehiculosData.find(v => v.name === newVehicleName.toUpperCase())) {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'vehicles'), { name: newVehicleName.toUpperCase(), km: 0 });
+            setNewVehicleName(""); showNotification("Vehículo agregado");
+        }
+    };
+    const removeVehicle = async (id, name) => { if(window.confirm(`¿Eliminar vehículo ${name}?`)) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'vehicles', id)); };
+    const updateVehicleData = async (id, field, value) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'vehicles', id), { [field]: value }); };
+
+    const handleChangeAdminPassword = async () => {
+        if (newAdminPasswordToChange.length < 6) { showNotification("La contraseña debe tener al menos 6 caracteres", "error"); return; }
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: newAdminPasswordToChange }, { merge: true }); showNotification("Contraseña actualizada"); setIsChangeAdminPasswordOpen(false); setNewAdminPasswordToChange(""); } 
+        catch (e) { showNotification("Error al actualizar la contraseña", "error"); }
+    };
+
+    const handleEditMaintenance = (record) => {
+        if(record === 'new') {
+            setEditingMaintenanceId(null);
+            setMaintenanceFormData({ vehiculo: vehiculosData.length > 0 ? vehiculosData[0].name : '', tipo: 'Service / Cambio de Aceite', fecha: new Date().toISOString().split('T')[0], km: '', estado: 'Pendiente', observaciones: '', tecnicoAsignado: '' });
+        } else {
+            setEditingMaintenanceId(record.id);
+            setMaintenanceFormData(record);
+        }
+        setIsMaintenanceModalOpen(true);
+    };
+
+    const handleSaveMaintenance = async (e) => {
+        e.preventDefault();
+
+        if (maintenanceFormData.fecha) {
+            const mDate = new Date(maintenanceFormData.fecha);
+            
+            const overlappingServices = services.filter(s => {
+                if (s.estado === 'Finalizado' || s.estado === 'No Finalizado') return false;
+                if (!s.fInicio || !s.fFin) return false;
+                const existingStart = new Date(s.fInicio);
+                const existingEnd = new Date(s.fFin);
+                return (mDate <= existingEnd) && (mDate >= existingStart);
+            });
+
+            let conflictTech = null;
+            let conflictVeh = null;
+
+            for (const s of overlappingServices) {
+                if (maintenanceFormData.vehiculo && s.vehiculos?.includes(maintenanceFormData.vehiculo)) {
+                    conflictVeh = maintenanceFormData.vehiculo;
+                    break;
+                }
+                if (maintenanceFormData.tecnicoAsignado && s.tecnicos?.includes(maintenanceFormData.tecnicoAsignado)) {
+                    conflictTech = maintenanceFormData.tecnicoAsignado;
+                    break;
+                }
+            }
+
+            if (conflictVeh) {
+                showNotification(`El vehículo ${conflictVeh} está afectado a un servicio en esta fecha.`, "error");
+                return;
+            }
+            if (conflictTech) {
+                showNotification(`El técnico ${conflictTech} está afectado a un servicio en esta fecha.`, "error");
+                return;
+            }
+        }
+
+        if (editingMaintenanceId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', editingMaintenanceId), maintenanceFormData); showNotification("Registro actualizado"); } 
+        else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance'), maintenanceFormData); showNotification("Mantenimiento agendado"); }
+        setIsMaintenanceModalOpen(false);
+    };
+
+    const handleMaintenanceStatusChange = async (id, newStatus) => {
+        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id), { estado: newStatus }); showNotification(`Movido a ${newStatus}`); } catch (e) {}
+    };
+
+    const handleDeleteMaintenance = async (id) => {
+        if(window.confirm('¿Seguro que deseas eliminar este registro de mantenimiento?')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id)); showNotification("Registro eliminado"); }
     };
 
     const handleEdit = (service) => {
@@ -2729,36 +2188,100 @@ export default function App() {
         setIsSidebarOpen(true);
     };
 
-    const handleEditMaintenance = (maintenanceItem) => {
-        // Mantenimiento de flota no tiene edición en el panel principal.
-        // Usamos una función vacía para evitar errores al hacer clic en el kanban.
-        console.log('Editar mantenimiento no implementado', maintenanceItem);
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if ((formData.tipoTrabajo === "Montaje de Transformador" || formData.tipoTrabajo === "Supervisión de Montaje") && !formData.ubicacion) {
+            showNotification("La ubicación es obligatoria para trabajos de Montaje o Supervisión.", "error");
+            return;
+        }
+
+        if (formData.fInicio && formData.fFin) {
+            const newStart = new Date(formData.fInicio);
+            const newEnd = new Date(formData.fFin);
+
+            const overlappingServices = services.filter(s => {
+                if (s.id === editingId) return false;
+                if (s.estado === 'Finalizado' || s.estado === 'No Finalizado') return false;
+                if (!s.fInicio || !s.fFin) return false;
+                const existingStart = new Date(s.fInicio);
+                const existingEnd = new Date(s.fFin);
+                return (newStart <= existingEnd) && (newEnd >= existingStart);
+            });
+
+            const overlappingMaintenance = maintenanceRecords.filter(m => {
+                if (m.estado === 'Realizado') return false;
+                if (!m.fecha) return false;
+                const mDate = new Date(m.fecha);
+                return (newStart <= mDate) && (newEnd >= mDate);
+            });
+
+            let conflictTech = null;
+            let conflictVeh = null;
+            let conflictSource = null;
+
+            for (const s of overlappingServices) {
+                if (formData.tecnicos && formData.tecnicos.length > 0) {
+                    conflictTech = formData.tecnicos.find(t => s.tecnicos?.includes(t));
+                    if (conflictTech) { conflictSource = s.tipoTrabajo === 'Vacaciones' ? 'vacaciones/ausencia' : `el servicio a ${s.cliente}`; break; }
+                }
+                if (formData.vehiculos && formData.vehiculos.length > 0) {
+                    conflictVeh = formData.vehiculos.find(v => s.vehiculos?.includes(v));
+                    if (conflictVeh) { conflictSource = `el servicio a ${s.cliente}`; break; }
+                }
+            }
+
+            if (!conflictVeh && formData.vehiculos && formData.vehiculos.length > 0) {
+                for (const m of overlappingMaintenance) {
+                    conflictVeh = formData.vehiculos.find(v => v === m.vehiculo);
+                    if (conflictVeh) { conflictSource = `mantenimiento de flota programado`; break; }
+                }
+            }
+            if (!conflictTech && formData.tecnicos && formData.tecnicos.length > 0) {
+                for (const m of overlappingMaintenance) {
+                    conflictTech = formData.tecnicos.find(t => t === m.tecnicoAsignado);
+                    if (conflictTech) { conflictSource = `tareas de mantenimiento a ${m.vehiculo}`; break; }
+                }
+            }
+
+            if (conflictTech) {
+                showNotification(`El técnico ${conflictTech} ya está afectado en esa fecha a ${conflictSource}.`, "error");
+                return;
+            }
+            if (conflictVeh) {
+                showNotification(`El vehículo ${conflictVeh} ya está afectado en esa fecha a ${conflictSource}.`, "error");
+                return;
+            }
+        }
+
         const serviceData = { 
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,
             progressLogs: editingId ? (services.find(s=>s.id===editingId)?.progressLogs || []) : [],
-            dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : [],
-            ensayos: editingId ? (services.find(s=>s.id===editingId)?.ensayos || []) : []
+            dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : []
         };
         if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); showNotification("Servicio actualizado"); } 
         else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); showNotification("Servicio creado"); }
         setLastSavedService(serviceData);
-        setShowMsgModal(true);
+        if (!editingId || (editingId && !formData.postergado)) setShowMsgModal(true);
         setIsSidebarOpen(false);
     };
 
-    const handleUpdateServiceTests = async (testUpdates) => {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingTestsService.id), testUpdates);
-        setManagingTestsService(prev => ({...prev, ...testUpdates}));
-        showNotification("Ensayos guardados");
+    const handleWhatsApp = (techName) => {
+        if (!lastSavedService) return;
+        const tech = tecnicosData.find(t => t.name === techName);
+        if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
+        const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n>> Iniciar en App al llegar.`;
+        window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
-    const handleMaintenanceStatusChange = async (id, newStatus) => {
-        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet_maintenance', id), { estado: newStatus }); showNotification(`Movido a ${newStatus}`); } catch (e) {}
+    const handleEmail = (techName) => {
+        if (!lastSavedService) return;
+        const tech = tecnicosData.find(t => t.name === techName);
+        if (!tech || !tech.email) { showNotification(`Sin correo para ${techName}`, "error"); return; }
+        const subject = encodeURIComponent(`Asignación de Servicio: ${lastSavedService.cliente}`);
+        const body = encodeURIComponent(`Hola ${techName},\n\nSe te ha asignado un nuevo servicio.\n\nCliente: ${lastSavedService.cliente}\nFecha: ${formatDate(lastSavedService.fInicio)} al ${formatDate(lastSavedService.fFin)}\nTarea: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n\nRevisa el portal.`);
+        window.location.href = `mailto:${tech.email}?subject=${subject}&body=${body}`;
     };
 
     const handleStatusChange = async (serviceId, newStatus) => {
@@ -2767,33 +2290,22 @@ export default function App() {
         try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', serviceId), updateData); showNotification(`Movido a ${newStatus}`); } catch (e) { }
     };
 
-    const handleLogHours = async () => { 
-        const newLog = { ...dailyLogData, id: Date.now(), workers: techsForHours }; 
-        const updatedLogs = [...(loggingHoursService.dailyLogs || []), newLog]; 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', loggingHoursService.id), { dailyLogs: updatedLogs }); 
-        setLoggingHoursService(null); showNotification("Horas registradas"); 
-    };
+    const handleTechEvidenceUpload = async () => { if (evidenceData.files.length === 0 && !evidenceData.comment.trim()) return; const newLog = { id: Date.now(), date: new Date().toLocaleString(), comment: evidenceData.comment, files: evidenceData.files }; const updatedLogs = [...(uploadingEvidenceService.progressLogs || []), newLog]; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', uploadingEvidenceService.id), { progressLogs: updatedLogs }); setUploadingEvidenceService(null); showNotification("Avance subido"); };
+    const handleLogHours = async () => { const newLog = { ...dailyLogData, id: Date.now(), workers: techsForHours }; const updatedLogs = [...(loggingHoursService.dailyLogs || []), newLog]; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', loggingHoursService.id), { dailyLogs: updatedLogs }); setLoggingHoursService(null); showNotification("Horas registradas"); };
+    const handleStartService = async (service) => { const startLog = { id: Date.now(), date: new Date().toLocaleString(), comment: `🚀 INICIO`, files: [] }; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', service.id), { estado: 'En Servicio', progressLogs: [...(service.progressLogs||[]), startLog] }); showNotification("Servicio iniciado"); };
+    const handleTechClosure = async () => { const closureInfo = { ...closureData, date: new Date().toISOString() }; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', closingService.id), { estado: closureData.status, closureData: closureInfo }); setClosingService(null); showNotification("Servicio cerrado"); };
+    const handleReopenService = async () => { const newLog = { id: Date.now(), date: new Date().toLocaleString(), comment: `🔄 REAPERTURA: ${reopenReason}`, files: [] }; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', reopeningService.id), { estado: 'En Servicio', progressLogs: [...(reopeningService.progressLogs||[]), newLog] }); setReopeningService(null); };
+    const handleDelete = (id) => setDeletingId(id);
+    const confirmDelete = async () => { if (deletingId) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', deletingId)); setDeletingId(null); showNotification("Servicio eliminado"); } };
 
-    const handleTechEvidenceUpload = async () => { 
-        const newLog = { id: Date.now(), date: new Date().toLocaleString(), comment: evidenceData.comment, files: evidenceData.files }; 
-        const updatedLogs = [...(uploadingEvidenceService.progressLogs || []), newLog]; 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', uploadingEvidenceService.id), { progressLogs: updatedLogs }); 
-        setUploadingEvidenceService(null); showNotification("Avance subido"); 
-    };
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
-    const handleTechClosure = async () => { 
-        const closureInfo = { ...closureData, date: new Date().toISOString() }; 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', closingService.id), { estado: closureData.status, closureData: closureInfo }); 
-        setClosingService(null); showNotification("Servicio cerrado"); 
-    };
-
-    const handleStartService = async (service) => { 
-        const startLog = { id: Date.now(), date: new Date().toLocaleString(), comment: `🚀 INICIO`, files: [] }; 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', service.id), { estado: 'En Servicio', progressLogs: [...(service.progressLogs||[]), startLog] }); 
-        showNotification("Servicio iniciado"); 
-    };
-
-    const handleDelete = async (id) => { if (window.confirm("¿Eliminar servicio?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', id)); showNotification("Eliminado"); } };
+    const overdueServices = services.filter(s => s.estado !== 'Finalizado' && s.fFin < todayStr && s.tipoTrabajo !== 'Vacaciones' && s.tipoTrabajo !== 'Estudios Médicos');
+    const upcomingMedical = services.filter(s => s.estado !== 'Finalizado' && s.tipoTrabajo === 'Estudios Médicos' && (s.fInicio === tomorrowStr || s.fInicio === todayStr));
+    const upcomingMaintenance = maintenanceRecords.filter(m => m.estado === 'Pendiente' && (m.fecha === tomorrowStr || m.fecha === todayStr));
 
     if (!user) return <LoginScreen onLogin={setUser} tecnicosData={tecnicosData}/>;
 
@@ -2804,92 +2316,472 @@ export default function App() {
             <div className="absolute inset-0 app-overlay z-0"></div>
             <GlobalStyles />
             
-            {/* Header Móvil */}
             <div className="lg:hidden absolute top-0 left-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-100 z-40 px-4 py-3 flex justify-between items-center shadow-sm">
                 <div className="flex items-center">
                     <img src={COMPANY_LOGO} alt="Logo" className="w-8 h-8 object-contain mr-2" />
-                    <span className="font-black text-slate-800 text-sm">PLANIFICACIÓN</span>
+                    <span className="font-black text-slate-800 text-sm tracking-tight">PLANIFICACIÓN</span>
                 </div>
-                <button onClick={() => setIsSidebarOpen(true)} className="text-orange-600 p-2 bg-orange-50 rounded-lg shadow-sm"><Menu className="w-5 h-5" /></button>
+                <button onClick={() => setIsSidebarOpen(true)} className="text-orange-600 p-2 bg-orange-50 hover:bg-orange-100 rounded-lg flex items-center transition-colors shadow-sm">
+                    <Menu className="w-5 h-5 mr-1" /> <span className="text-xs font-bold uppercase">Agendar / Menú</span>
+                </button>
             </div>
 
-            {/* Sidebar Lateral */}
-            <div className={`fixed inset-y-0 left-0 z-50 w-full lg:w-80 bg-white border-r border-slate-100 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-                    <div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black uppercase">Postventa</h2></div></div>
-                    <button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-rose-500"><X className="w-6 h-6"/></button>
-                </div>
+            <div className={`fixed inset-y-0 left-0 z-50 w-full lg:w-80 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white"><div className="flex items-center"><img src={COMPANY_LOGO} alt="Logo" className="w-10 h-10 object-contain mr-2" /><div><h2 className="text-sm font-black">PLANIFICACIÓN</h2><p className="text-xs font-bold text-orange-600">POSTVENTA</p></div></div><button onClick={()=>setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"><X className="w-6 h-6"/></button></div>
                 {isAdmin ? (
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
                         <div className="mb-6 space-y-2">
-                            <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold shadow-sm"><span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Flota</span><ChevronRight className="w-4 h-4 text-slate-300"/></button>
+                            <button onClick={() => setIsManageTechOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
+                                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-slate-400"/> Personal y Flota</span><ChevronRight className="w-4 h-4 text-slate-300"/>
+                            </button>
+                            <button onClick={() => setIsChangeAdminPasswordOpen(true)} className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-orange-300 text-sm font-bold transition-all shadow-sm">
+                                <span className="flex items-center"><Key className="w-4 h-4 mr-2 text-slate-400"/> Clave Administrador</span><ChevronRight className="w-4 h-4 text-slate-300"/>
+                            </button>
                         </div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Agendar Tarea</p>
+
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asignación</p>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <select className="input-field" value={formData.tipoTrabajo} onChange={e=>setFormData({...formData, tipoTrabajo: e.target.value})}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                            {editingId && (<div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-sm flex justify-between items-center"><span className="font-bold text-amber-800">✏️ Editando...</span><button type="button" onClick={resetForm} className="text-xs bg-white border px-2 py-1 rounded">Cancelar</button></div>)}
+                            <div className="form-group">
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">TIPO</label>
+                                <select className="input-field" value={formData.tipoTrabajo} onChange={e=>{
+                                    const v = e.target.value; 
+                                    const isAbsence = v === 'Vacaciones' || v === 'Estudios Médicos';
+                                    setFormData(p=>({...p, tipoTrabajo: v, cliente: isAbsence?'INTERNO':p.cliente, oci: isAbsence?v.toUpperCase():p.oci, vehiculos: isAbsence?[]:p.vehiculos}));
+                                }}>{TIPOS_TRABAJO.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                {formData.tipoTrabajo === 'Otro' && (
+                                    <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
+                                )}
+                            </div>
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
+                            <div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
                             
-                            {REQUIRES_TESTS_TYPES.includes(formData.tipoTrabajo) && (
-                                <div className="form-group mt-2">
-                                    <label className="text-[10px] font-bold text-teal-600 mb-1 block uppercase">Cant. de Trafos (Ensayos)</label>
-                                    <input type="number" min="1" className="input-field text-xs border-teal-200" value={formData.cantidadTrafos || 1} onChange={e=>setFormData({...formData, cantidadTrafos: parseInt(e.target.value) || 1})} />
+                            {/* --- SECCIÓN ALCANCE Y FECHA SOLICITUD --- */}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="form-group">
+                                        <label className="text-xs font-bold text-slate-500 mb-1 block">ALCANCE</label>
+                                        <select className="input-field text-xs bg-white" value={formData.alcance} onChange={e=>setFormData({...formData, alcance:e.target.value})}>
+                                            <option value="Nacional">Nacional</option>
+                                            <option value="Internacional">Internacional</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="text-xs font-bold text-slate-500 mb-1 block">FECHA SOLICITUD</label>
+                                        <input type="date" className="input-field text-xs bg-white" value={formData.fSolicitud} onChange={e=>setFormData({...formData, fSolicitud:e.target.value})} />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="form-group">
+                                <div className="flex justify-between items-center mb-1"><label className="text-xs font-bold text-slate-500">TÉCNICOS</label></div>
+                                <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
+                                    {tecnicosData.map(t=>(<label key={t.id} className={`flex items-center space-x-2 p-1 rounded cursor-pointer ${formData.tecnicos.includes(t.name)?'bg-orange-100 font-bold text-orange-800':''}`}><input type="checkbox" checked={formData.tecnicos.includes(t.name)} onChange={()=>{const newTechs = formData.tecnicos.includes(t.name) ? formData.tecnicos.filter(n=>n!==t.name) : [...formData.tecnicos, t.name]; setFormData({...formData, tecnicos: newTechs});}} className="accent-orange-600"/><span className="text-xs">{t.name}</span></label>))}
+                                </div>
+                            </div>
+
+                            {/* --- SECCIÓN DATOS TRANSFORMADOR Y SITIO --- */}
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-orange-200 transition-colors animate-in fade-in">
+                                    <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR Y SITIO</label>
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
+                                        <input type="text" placeholder="Nº Fabricación" className="input-field text-xs bg-white" value={formData.trafoFabricacion} onChange={e=>setFormData({...formData, trafoFabricacion:e.target.value})} />
+                                        <input type="text" placeholder="Nº Serie" className="input-field text-xs bg-white" value={formData.trafoSerie} onChange={e=>setFormData({...formData, trafoSerie:e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
+                                        <input type="text" placeholder="Potencia (KVA)" className="input-field text-xs bg-white" value={formData.trafoPotencia} onChange={e=>setFormData({...formData, trafoPotencia:e.target.value})} />
+                                        <input type="text" placeholder="Relación/Tens" className="input-field text-xs bg-white" value={formData.trafoRelacion} onChange={e=>setFormData({...formData, trafoRelacion:e.target.value})} />
+                                    </div>
+                                    <div className="mb-2">
+                                        <input type="text" placeholder="Contacto Responsable (Ej: Juan Perez - 3512...)" className="input-field text-xs bg-white w-full" value={formData.contactoResponsable} onChange={e=>setFormData({...formData, contactoResponsable:e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Ubicación (Ciudad o Coordenadas)</label>
+                                        <input type="text" placeholder="Ej: Neuquén, Argentina o -38.95, -68.05" className="input-field text-xs bg-white w-full" value={formData.ubicacion} onChange={e=>setFormData({...formData, ubicacion:e.target.value})} />
+                                        <p className="text-[9px] text-slate-400 mt-1 leading-tight">Evita enlaces cortos (goo.gl). Ingresa el nombre de la ciudad o lat/lng para que aparezca en el mapa.</p>
+                                    </div>
                                 </div>
                             )}
 
-                            <input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/>
-                            <input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/>
-                            <div className="grid grid-cols-2 gap-2">
-                                <input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/>
-                                <input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/>
-                            </div>
-                            <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
+                            {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">VEHÍCULOS</label><div className="flex flex-wrap gap-1">
+                                {vehiculosData.map(v=>(<label key={v.id} className={`text-[10px] px-2 py-1 border rounded cursor-pointer transition-colors ${formData.vehiculos.includes(v.name)?'bg-orange-500 text-white border-orange-500 font-bold shadow-sm':'bg-white text-slate-600 hover:bg-orange-50 hover:border-orange-200'}`}><input type="checkbox" className="hidden" checked={formData.vehiculos.includes(v.name)} onChange={()=>{const newVehs = formData.vehiculos.includes(v.name) ? formData.vehiculos.filter(x=>x!==v.name) : [...formData.vehiculos, v.name]; setFormData({...formData, vehiculos: newVehs});}}/>{v.name}</label>))}
+                                {vehiculosData.length === 0 && <span className="text-[10px] text-slate-400">Sin vehículos en la base.</span>}
+                            </div></div>)}
+                            
+                            <div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">OBSERVACIONES</label><textarea className="input-field h-24 resize-none text-xs" placeholder="Detalles del trabajo..." value={formData.observaciones} onChange={e=>setFormData({...formData, observaciones:e.target.value})} /></div>
+
+                            <button className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all">{editingId ? 'Guardar Cambios' : 'Agendar'}</button>
                         </form>
                     </div>
                 ) : (
-                    <div className="p-8 text-center flex-1 flex flex-col justify-center items-center">
-                        <UserCheck className="w-12 h-12 text-orange-400 mb-2"/>
-                        <h3 className="text-lg font-black text-slate-700">¡Hola, {user.name}!</h3>
+                    <div className="p-8 text-center flex-1 text-slate-400 bg-white/50 backdrop-blur-sm m-4 rounded-xl border border-slate-100 shadow-inner flex flex-col justify-center items-center">
+                        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-100">
+                            <UserCheck className="w-10 h-10 text-orange-400"/>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-700 mb-1">¡Hola, {user.name}!</h3>
+                        <p className="text-sm">Bienvenido a tu panel de control.</p>
                     </div>
                 )}
-                <div className="p-4 border-t border-slate-100"><button onClick={()=>setUser(null)} className="flex items-center justify-center w-full py-2 text-slate-500 hover:text-rose-600 font-medium"><LogOut className="w-4 h-4 mr-2"/> Salir</button></div>
+                <div className="p-4 border-t border-slate-100 bg-white"><button onClick={()=>setUser(null)} className="flex items-center justify-center w-full py-2 text-slate-500 hover:text-rose-600 font-medium transition-colors"><LogOut className="w-4 h-4 mr-2"/> Salir</button></div>
             </div>
 
-            {/* Área Principal */}
             <div className="flex-1 flex flex-col overflow-hidden relative z-10 pt-[68px] lg:pt-0">
-                <header className="bg-white/95 border-b border-slate-100 px-8 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm gap-4">
-                    <h1 className="text-xl font-black text-slate-800 tracking-tight">POSTVENTA TTE</h1>
-                    <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
-                        {isAdmin ? (
-                            <>
-                                <button onClick={()=>setActiveTab('kanban')} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab==='kanban'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}>Tablero</button>
-                                <button onClick={()=>setActiveTab('tests')} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab==='tests'?'bg-white text-teal-600 shadow-sm':'text-slate-500'}`}>Ensayos</button>
-                                <button onClick={()=>setActiveTab('history')} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}>Historial</button>
-                            </>
-                        ) : (
-                            <>
-                                <button onClick={()=>setActiveTab('tasks')} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}>Mis Tareas</button>
-                                <button onClick={()=>setActiveTab('history')} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500'}`}>Historial</button>
-                            </>
-                        )}
-                    </div>
+                <header className="bg-white/95 border-b border-slate-100 px-8 py-4 flex flex-col md:flex-row justify-between items-center shadow-sm backdrop-blur-sm gap-4">
+                    <h1 className="text-2xl font-black text-slate-800 tracking-tight hidden md:block">Dashboard</h1>
+                    {isAdmin && (
+                        <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
+                            {[
+                                {id:'map', label:'Mapa Mundial', icon:MapIcon},
+                                {id:'kanban', label:'Tablero', icon:Columns},
+                                {id:'gantt', label:'Cronograma', icon:Calendar},
+                                {id:'sheet', label:'Planilla', icon:List},
+                                {id:'vehicles', label:'Flota', icon:Truck}, 
+                                {id:'vacations', label:'Vacaciones', icon:Palmtree},
+                                {id:'history', label:'Historial', icon:History},
+                                {id:'kpis', label:'KPIs', icon:BarChart2},
+                                {id:'surveys', label:'Encuestas', icon:ClipboardList} 
+                            ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
+                        </div>
+                    )}
+                    {!isAdmin && (
+                        <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
+                            <button onClick={()=>changeTab('tasks')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='tasks'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><LayoutList className="w-4 h-4 mr-2"/> Mis Tareas</button>
+                            <button onClick={()=>changeTab('map')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='map'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><MapIcon className="w-4 h-4 mr-2"/> Mapa Mundial</button>
+                            <button onClick={()=>changeTab('history')} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab==='history'?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><History className="w-4 h-4 mr-2"/> Historial</button>
+                        </div>
+                    )}
                 </header>
 
                 <main className="flex-1 overflow-auto p-4 md:p-6 custom-scrollbar">
-                    {activeTab === 'kanban' && <KanbanBoard services={services} maintenanceRecords={maintenanceRecords} onStatusChange={handleStatusChange} onMaintenanceStatusChange={handleMaintenanceStatusChange} handleEditService={handleEdit} handleEditMaintenance={handleEditMaintenance}/>}
-                    {activeTab === 'tasks' && <TechPortal services={services} maintenanceRecords={maintenanceRecords} user={user} handleStartService={handleStartService} onMaintenanceStatusChange={handleMaintenanceStatusChange} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} showNotification={showNotification} setManagingTestsService={setManagingTestsService} />}
-                    {activeTab === 'history' && <TransformerHistory services={services} />}
-                    {activeTab === 'tests' && <EnsayosDashboard services={services} />}
+                    {notification && <div className={`fixed top-20 right-8 px-6 py-3 rounded-xl shadow-lg z-50 animate-in fade-in text-white font-bold flex items-center ${notification.type==='error'?'bg-rose-500':'bg-emerald-500'}`}>{notification.msg}</div>}
+                    
+                    {isAdmin && (overdueServices.length > 0 || upcomingMedical.length > 0 || upcomingMaintenance.length > 0) && (
+                        <div className="mb-6 space-y-3 animate-in fade-in slide-in-from-top-4 max-w-7xl mx-auto">
+                            {overdueServices.length > 0 && (
+                                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3.5 rounded-xl flex items-center shadow-sm">
+                                    <AlertTriangle className="w-5 h-5 mr-3 text-rose-600 shrink-0"/>
+                                    <span className="text-sm font-medium">Hay <b>{overdueServices.length} servicio(s)</b> con fecha de fin superada que siguen sin marcarse como "Finalizado" en el tablero.</span>
+                                </div>
+                            )}
+                            {upcomingMedical.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3.5 rounded-xl flex items-center shadow-sm">
+                                    <Activity className="w-5 h-5 mr-3 text-amber-600 shrink-0"/>
+                                    <span className="text-sm font-medium">Recordatorio: En el transcurso de hoy o mañana hay <b>{upcomingMedical.length} turno(s)</b> programado(s) para Estudios Médicos.</span>
+                                </div>
+                            )}
+                            {upcomingMaintenance.length > 0 && (
+                                <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-4 py-3.5 rounded-xl flex items-center shadow-sm">
+                                    <Truck className="w-5 h-5 mr-3 text-indigo-600 shrink-0"/>
+                                    <span className="text-sm font-medium">Recordatorio: En el transcurso de hoy o mañana hay <b>{upcomingMaintenance.length} mantenimiento(s)</b> de vehículo programado(s).</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {isAdmin ? (
+                        <div className="max-w-7xl mx-auto h-full">
+                            {activeTab === 'map' && <MapDashboard services={services} />}
+                            {activeTab === 'kanban' && <KanbanBoard services={services} maintenanceRecords={maintenanceRecords} onStatusChange={handleStatusChange} onMaintenanceStatusChange={handleMaintenanceStatusChange} handleEditService={handleEdit} handleEditMaintenance={handleEditMaintenance}/>}
+                            {activeTab === 'gantt' && <GanttChart services={services} mode="operations" handleEdit={handleEdit} isAdmin={isAdmin}/>}
+                            {activeTab === 'sheet' && <ServiceSheet sortedServices={services} mode="operations" handleEdit={handleEdit} handleDelete={handleDelete}/>}
+                            {activeTab === 'vehicles' && (
+                                <div className="space-y-6">
+                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm flex justify-between items-center">
+                                        <div><h3 className="font-bold text-orange-800 text-sm flex items-center"><Calendar className="w-4 h-4 mr-2"/> Calendario de Mantenimientos</h3><p className="text-xs text-orange-600">Próximos mantenimientos de la flota.</p></div>
+                                        <button onClick={() => handleEditMaintenance('new')} className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold flex items-center hover:bg-orange-700 shadow-md active:scale-95 text-xs"><Plus className="w-4 h-4 mr-2"/> Nuevo Registro</button>
+                                    </div>
+                                    <GanttChart maintenanceRecords={maintenanceRecords} mode="fleet" handleEdit={handleEditMaintenance} isAdmin={isAdmin}/>
+                                    <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
+                                        <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200">
+                                            <table className="min-w-full divide-y divide-slate-100 text-sm">
+                                                <thead className="bg-slate-50">
+                                                    <tr>
+                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Vehículo</th>
+                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Tipo de Tarea</th>
+                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Fecha Prog.</th>
+                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Técnico</th>
+                                                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-xs">Estado</th>
+                                                        <th className="px-6 py-4 text-right font-bold text-slate-600 uppercase tracking-wider text-xs">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {maintenanceRecords.sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r => (
+                                                        <tr key={r.id} className="hover:bg-orange-50/30 transition-colors">
+                                                            <td className="px-6 py-4 font-bold text-slate-800">{r.vehiculo}</td>
+                                                            <td className="px-6 py-4 text-slate-600 font-medium">{r.tipo}</td>
+                                                            <td className="px-6 py-4 text-slate-500 font-medium">{formatDate(r.fecha)}</td>
+                                                            <td className="px-6 py-4 text-slate-500">{r.tecnicoAsignado || 'N/A'}</td>
+                                                            <td className="px-6 py-4">
+                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.estado === 'Realizado' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : r.estado === 'En Taller' ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>{r.estado}</span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                                <button onClick={() => handleEditMaintenance(r)} className="text-orange-500 hover:text-orange-700 mx-2 p-1 hover:bg-orange-50 rounded"><Edit2 className="w-4 h-4"/></button>
+                                                                <button onClick={() => handleDeleteMaintenance(r.id)} className="text-rose-400 hover:text-rose-600 mx-2 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {maintenanceRecords.length === 0 && <tr><td colSpan="6" className="text-center py-12 text-slate-400 italic">No hay mantenimientos registrados.</td></tr>}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {activeTab === 'vacations' && (<div className="space-y-6"><GanttChart services={services} mode="vacations" handleEdit={handleEdit} isAdmin={isAdmin}/><ServiceSheet sortedServices={services} mode="vacations" handleEdit={handleEdit} handleDelete={handleDelete}/></div>)}
+                            {activeTab === 'history' && <TransformerHistory services={services} />}
+                            {activeTab === 'kpis' && <KPIs services={services} vehiculosData={vehiculosData} />}
+                            {activeTab === 'surveys' && <SurveyDashboard surveys={surveysData} />}
+                        </div>
+                    ) : (
+                        <div className="max-w-7xl mx-auto h-full">
+                            {activeTab === 'map' && <MapDashboard services={services} />}
+                            {activeTab === 'tasks' && <TechPortal services={services} maintenanceRecords={maintenanceRecords} user={user} handleStartService={handleStartService} onMaintenanceStatusChange={handleMaintenanceStatusChange} setUploadingEvidenceService={setUploadingEvidenceService} setEvidenceData={setEvidenceData} setLoggingHoursService={setLoggingHoursService} setDailyLogData={setDailyLogData} setTechsForHours={setTechsForHours} setClosingService={setClosingService} setClosureData={setClosureData} setReopeningService={setReopeningService} setReopenReason={setReopenReason} showNotification={showNotification} />}
+                            {activeTab === 'history' && <TransformerHistory services={services} />}
+                        </div>
+                    )}
                 </main>
+
+                {isAdmin && (
+                    <button 
+                        onClick={() => {
+                            resetForm();
+                            setIsSidebarOpen(true);
+                        }}
+                        className="lg:hidden fixed bottom-6 right-6 z-30 bg-orange-600 text-white p-4 rounded-full shadow-xl shadow-orange-300 hover:bg-orange-700 active:scale-95 transition-all"
+                    >
+                        <Plus className="w-6 h-6" />
+                    </button>
+                )}
             </div>
 
-            {/* Modal para Ensayos Eléctricos */}
-            <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Ensayos Eléctricos del Equipo" size="xl">
-                {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
+            {/* --- MODAL PARA MANTENIMIENTO DE FLOTA --- */}
+            <Modal isOpen={isMaintenanceModalOpen} onClose={()=>setIsMaintenanceModalOpen(false)} title={editingMaintenanceId ? 'Editar Mantenimiento' : 'Agendar Mantenimiento'}>
+                <form onSubmit={handleSaveMaintenance} className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Vehículo</label>
+                        <select className="input-field" value={maintenanceFormData.vehiculo} onChange={e=>setMaintenanceFormData({...maintenanceFormData, vehiculo: e.target.value})}>
+                            {vehiculosData.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                            {vehiculosData.length === 0 && <option value="">Sin vehículos registrados</option>}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo de Tarea</label>
+                        <select className="input-field" value={maintenanceFormData.tipo} onChange={e=>setMaintenanceFormData({...maintenanceFormData, tipo: e.target.value})}>
+                            <option value="Service / Cambio de Aceite">Service / Cambio de Aceite</option>
+                            <option value="VTV / RTO">VTV / RTO</option>
+                            <option value="Cambio de Cubiertas">Cambio de Cubiertas</option>
+                            <option value="Renovación Seguro">Renovación Seguro</option>
+                            <option value="Reparación Mecánica">Reparación Mecánica</option>
+                            <option value="Mantenimiento General">Mantenimiento General</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Técnico Asignado (Para traslado o gestión)</label>
+                        <select className="input-field" value={maintenanceFormData.tecnicoAsignado || ''} onChange={e=>setMaintenanceFormData({...maintenanceFormData, tecnicoAsignado: e.target.value})}>
+                            <option value="">Taller Externo / No requiere</option>
+                            {tecnicosData.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">Fecha</label>
+                            <input type="date" className="input-field text-xs" value={maintenanceFormData.fecha} onChange={e=>setMaintenanceFormData({...maintenanceFormData, fecha: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">Kilometraje</label>
+                            <input type="number" className="input-field text-xs" value={maintenanceFormData.km} onChange={e=>setMaintenanceFormData({...maintenanceFormData, km: e.target.value})} placeholder="Opcional"/>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Estado</label>
+                        <select className="input-field text-xs" value={maintenanceFormData.estado} onChange={e=>setMaintenanceFormData({...maintenanceFormData, estado: e.target.value})}>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Taller">En Taller / Proceso</option>
+                            <option value="Realizado">Realizado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Observaciones</label>
+                        <textarea className="input-field h-24 resize-none text-xs" value={maintenanceFormData.observaciones} onChange={e=>setMaintenanceFormData({...maintenanceFormData, observaciones: e.target.value})} placeholder="Detalles adicionales..."></textarea>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button type="button" onClick={() => setIsMaintenanceModalOpen(false)} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancelar</button>
+                        <button type="submit" className="flex-1 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg active:scale-95">{editingMaintenanceId ? 'Guardar' : 'Agendar'}</button>
+                    </div>
+                </form>
             </Modal>
 
-            {/* Modales de Bitácora, Horas y Cierre */}
-            <Modal isOpen={!!uploadingEvidenceService} onClose={()=>setUploadingEvidenceService(null)} title="Subir Avance"><div className="space-y-4"><textarea className="input-field h-24" placeholder="Comentario..." value={evidenceData.comment} onChange={e=>setEvidenceData({...evidenceData, comment:e.target.value})}/><FileUploader files={evidenceData.files} setFiles={(f)=>setEvidenceData({...evidenceData, files:f})} label="ARCHIVOS"/><button onClick={handleTechEvidenceUpload} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button></div></Modal>
-            <Modal isOpen={!!loggingHoursService} onClose={()=>setLoggingHoursService(null)} title="Cargar Horas"><div className="space-y-4"><input type="date" className="input-field" value={dailyLogData.date} onChange={e=>setDailyLogData({...dailyLogData, date:e.target.value})}/><div className="grid grid-cols-2 gap-2"><input type="time" className="input-field" value={dailyLogData.start} onChange={e=>setDailyLogData({...dailyLogData, start:e.target.value})}/><input type="time" className="input-field" value={dailyLogData.end} onChange={e=>setDailyLogData({...dailyLogData, end:e.target.value})}/></div><button onClick={handleLogHours} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Registrar</button></div></Modal>
-            <Modal isOpen={!!closingService} onClose={()=>setClosingService(null)} title="Cierre de Servicio"><div className="space-y-4"><textarea className="input-field h-24" placeholder="Observaciones finales..." value={closureData.observation} onChange={e=>setClosureData({...closureData, observation:e.target.value})}/><button onClick={handleTechClosure} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Cerrar Servicio</button></div></Modal>
+            {/* MODALES CONFIGURACIÓN Y OPERATIVOS */}
+            <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Gestión de Personal y Flota" size="lg">
+                <div className="flex space-x-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                    <button type="button" onClick={() => setManageTab('techs')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${manageTab === 'techs' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>Técnicos y Claves</button>
+                    <button type="button" onClick={() => setManageTab('vehicles')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${manageTab === 'vehicles' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>Flota de Vehículos</button>
+                </div>
+
+                {manageTab === 'techs' ? (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Nombre</label><input className="input-field bg-white text-xs py-2" placeholder="Nombre" value={newTechName} onChange={e=>setNewTechName(e.target.value.toUpperCase())} /></div>
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Teléfono</label><input className="input-field bg-white text-xs py-2" placeholder="Ej: 549351..." value={newTechPhone} onChange={e=>setNewTechPhone(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Correo</label><input type="email" className="input-field bg-white text-xs py-2" placeholder="Email" value={newTechEmail} onChange={e=>setNewTechEmail(e.target.value)} /></div>
+                            <div className="flex gap-2">
+                                <div className="flex-1"><label className="text-[10px] font-bold text-orange-700 uppercase mb-1 block">Contraseña</label><input className="input-field bg-white text-xs py-2" placeholder="Clave" value={newTechPassword} onChange={e=>setNewTechPassword(e.target.value)} /></div>
+                                <button onClick={addTechnician} className="bg-orange-600 text-white px-3 rounded-lg font-bold hover:bg-orange-700 active:scale-95 h-[34px] self-end shadow-md"><Plus className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                        <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg border border-blue-100 font-medium">
+                            💡 Puedes editar las contraseñas y datos directamente en los campos de abajo. ¡Se guardan automáticamente!
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            {tecnicosData.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>(
+                                <div key={t.id} className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:border-orange-200 transition-all group">
+                                    <div className="flex justify-between items-center mb-2"><span className="font-bold text-sm text-slate-700">{t.name}</span><button onClick={() => removeTechnician(t.id, t.name)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4" /></button></div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2"><Phone className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.phone || ''} onChange={(e) => updateTechData(t.id, 'phone', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Teléfono" /></div>
+                                        <div className="flex items-center gap-2"><Mail className="w-3 h-3 text-slate-400 shrink-0" /><input type="email" value={t.email || ''} onChange={(e) => updateTechData(t.id, 'email', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none transition-colors" placeholder="Correo" /></div>
+                                        <div className="flex items-center gap-2"><Key className="w-3 h-3 text-slate-400 shrink-0" /><input type="text" value={t.password || ''} onChange={(e) => updateTechData(t.id, 'password', e.target.value)} className="text-xs w-full bg-slate-50 border border-transparent rounded hover:border-slate-300 focus:border-orange-300 p-1.5 outline-none font-mono text-slate-700 transition-colors" placeholder="Contraseña" /></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 flex gap-2 items-end mb-6">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-indigo-700 uppercase mb-1 block">Patente / Nombre del Vehículo</label>
+                                <input className="input-field bg-white text-xs py-2" placeholder="Ej: KANGOO AB 123 CD" value={newVehicleName} onChange={e=>setNewVehicleName(e.target.value.toUpperCase())} />
+                            </div>
+                            <button type="button" onClick={addVehicle} className="bg-indigo-600 text-white px-4 rounded-lg font-bold hover:bg-indigo-700 active:scale-95 h-[34px] shadow-md flex items-center"><Plus className="w-4 h-4 mr-1"/> Agregar</button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            {vehiculosData.sort((a,b)=>a.name.localeCompare(b.name)).map(v=>(
+                                <div key={v.id} className="p-4 border border-slate-200 rounded-xl bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 group hover:border-indigo-200 transition-all">
+                                    <div className="flex items-center w-full md:w-auto">
+                                        <Truck className="w-5 h-5 text-indigo-400 mr-3 shrink-0"/>
+                                        <span className="font-bold text-sm text-slate-700 truncate max-w-[200px]">{v.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                                        <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                                            <Activity className="w-3.5 h-3.5 text-slate-400 mr-2"/>
+                                            <input 
+                                                type="number" 
+                                                value={v.km || ''} 
+                                                onChange={(e) => updateVehicleData(v.id, 'km', Number(e.target.value))} 
+                                                className="w-24 bg-transparent text-xs font-bold text-slate-700 outline-none" 
+                                                placeholder="Km actuales" 
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-400 ml-1">KM</span>
+                                        </div>
+                                        <button type="button" onClick={() => removeVehicle(v.id, v.name)} className="text-slate-300 hover:text-rose-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            {vehiculosData.length === 0 && <div className="text-center text-slate-400 text-sm py-4">No hay vehículos registrados. Agrega uno arriba.</div>}
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <Modal isOpen={isChangeAdminPasswordOpen} onClose={()=>setIsChangeAdminPasswordOpen(false)} title="Cambiar Clave de Administrador" size="sm">
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500">Ingresa la nueva contraseña maestra para acceder al panel de administración.</p>
+                    <input type="text" className="input-field font-mono" placeholder="Nueva contraseña (mínimo 6 caracteres)" value={newAdminPasswordToChange} onChange={e => setNewAdminPasswordToChange(e.target.value)}/>
+                    <button onClick={handleChangeAdminPassword} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">Actualizar Contraseña</button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={showMsgModal} onClose={()=>setShowMsgModal(false)} title="📢 Notificar Asignación">
+                 <div className="grid gap-3">
+                     {lastSavedService?.tecnicos.length > 0 ? (
+                         lastSavedService.tecnicos.map(t => (
+                             <div key={t} className="flex flex-col bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-300 hover:shadow-md transition-all group">
+                                 <div className="flex items-center mb-3"><div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mr-3 text-slate-500 font-bold">{t.charAt(0)}</div><span className="font-bold text-slate-700">{t}</span></div>
+                                 <div className="flex gap-2">
+                                     <button onClick={()=>handleWhatsApp(t)} className="flex-1 text-emerald-600 flex items-center justify-center text-xs font-bold bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><MessageCircle className="w-4 h-4 mr-1.5"/> WhatsApp</button>
+                                     <button onClick={()=>handleEmail(t)} className="flex-1 text-blue-600 flex items-center justify-center text-xs font-bold bg-blue-50 border border-blue-100 px-3 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"><Mail className="w-4 h-4 mr-1.5"/> Correo</button>
+                                 </div>
+                             </div>
+                         ))
+                     ) : (<p className="text-center text-slate-500 text-sm py-4">No hay técnicos asignados para notificar.</p>)}
+                 </div>
+            </Modal>
+
+            <Modal isOpen={!!uploadingEvidenceService} onClose={()=>setUploadingEvidenceService(null)} title="Subir Evidencia">
+                <div className="space-y-4">
+                    <textarea className="input-field h-24" placeholder="Comentario..." value={evidenceData.comment} onChange={e=>setEvidenceData({...evidenceData, comment:e.target.value})}/>
+                    <FileUploader files={evidenceData.files} setFiles={(f)=>setEvidenceData({...evidenceData, files:f})} label="ARCHIVOS"/>
+                    <button onClick={handleTechEvidenceUpload} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={!!loggingHoursService} onClose={()=>setLoggingHoursService(null)} title="Cargar Horas">
+                <div className="space-y-4">
+                    <input type="date" className="input-field" value={dailyLogData.date} onChange={e=>setDailyLogData({...dailyLogData, date:e.target.value})}/>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Tipo de Actividad</label>
+                        <select className="input-field" value={dailyLogData.type} onChange={e=>setDailyLogData({...dailyLogData, type:e.target.value})}>
+                            <option value="Trabajo">Trabajo en Sitio</option>
+                            <option value="Viaje">Viaje / Traslado</option>
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <input type="time" className="input-field" value={dailyLogData.start} onChange={e=>setDailyLogData({...dailyLogData, start:e.target.value})}/>
+                        <input type="time" className="input-field" value={dailyLogData.end} onChange={e=>setDailyLogData({...dailyLogData, end:e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Personal</label>
+                        <div className="max-h-24 overflow-y-auto border rounded p-2">
+                            {loggingHoursService?.tecnicos.map(t=>(
+                                <label key={t} className="flex items-center space-x-2"><input type="checkbox" checked={techsForHours.includes(t)} onChange={()=>setTechsForHours(prev=>prev.includes(t)?prev.filter(x=>x!==t):[...prev,t])} className="accent-indigo-600"/><span className="text-xs">{t}</span></label>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={handleLogHours} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Registrar</button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={!!closingService} onClose={()=>setClosingService(null)} title="Cierre de Servicio">
+                <div className="space-y-4">
+                    <div className="flex gap-2">
+                        <button onClick={()=>setClosureData({...closureData, status:'Finalizado'})} className={`flex-1 py-2 border rounded-lg font-bold ${closureData.status==='Finalizado'?'bg-emerald-50 border-emerald-500 text-emerald-700':'bg-white'}`}>Finalizado</button>
+                        <button onClick={()=>setClosureData({...closureData, status:'No Finalizado'})} className={`flex-1 py-2 border rounded-lg font-bold ${closureData.status==='No Finalizado'?'bg-rose-50 border-rose-500 text-rose-700':'bg-white'}`}>No Finalizado</button>
+                    </div>
+                    <textarea className="input-field h-24" placeholder="Observaciones finales..." value={closureData.observation} onChange={e=>setClosureData({...closureData, observation:e.target.value})}/>
+                    {closureData.status === 'No Finalizado' && (
+                        <div className="space-y-3 animate-in slide-in-from-top-2">
+                            <label className="block text-xs font-bold text-rose-500 uppercase tracking-wider">Especificar Motivo</label>
+                            <select className="input-field border-rose-200 focus:border-rose-500" value={closureData.reasonType} onChange={e => setClosureData({...closureData, reasonType: e.target.value, reason: e.target.value === 'Otros' ? '' : e.target.value})}>
+                                <option value="">Seleccione un motivo...</option><option value="Falta de repuestos">Falta de repuestos</option><option value="Falta de tiempo">Falta de tiempo</option><option value="Cliente ausente/no disponible">Cliente ausente / no disponible</option><option value="Condiciones climáticas adversas">Condiciones climáticas adversas</option><option value="Problema técnico no resuelto">Problema técnico no resuelto</option><option value="Otros">Otros (Especificar)</option>
+                            </select>
+                            {closureData.reasonType === 'Otros' && (
+                                <input className="input-field border-rose-200 focus:border-rose-500 animate-in fade-in" placeholder="Describa el motivo..." value={closureData.reason} onChange={e=>setClosureData({...closureData, reason:e.target.value})}/>
+                            )}
+                        </div>
+                    )}
+                    <FileUploader files={closureData.files} setFiles={(f)=>setClosureData({...closureData, files:f})} label="ACTA"/>
+                    <button onClick={handleTechClosure} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Confirmar Cierre</button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={!!reopeningService} onClose={()=>setReopeningService(null)} title="Reabrir">
+                <div className="space-y-4">
+                    <p className="text-sm bg-orange-50 p-3 rounded text-orange-800">El servicio volverá a estado "En Servicio".</p>
+                    <textarea className="input-field h-24" placeholder="Motivo..." value={reopenReason} onChange={e=>setReopenReason(e.target.value)}/>
+                    <button onClick={handleReopenService} className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold">Confirmar</button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={!!deletingId} onClose={()=>setDeletingId(null)} title="Eliminar">
+                <div className="text-center p-4">
+                    <p className="mb-4">¿Seguro deseas eliminar este registro permanentemente?</p>
+                    <div className="flex gap-2 justify-center">
+                        <button onClick={()=>setDeletingId(null)} className="px-4 py-2 bg-slate-100 rounded-lg font-bold text-slate-600">Cancelar</button>
+                        <button onClick={confirmDelete} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold">Eliminar</button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

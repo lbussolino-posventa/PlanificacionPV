@@ -30,7 +30,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 try { enableIndexedDbPersistence(db).catch((err) => {}); } catch (e) {}
 
-const BACKGROUND_IMAGE = "https://i.imgur.com/56hQQ72.png"; 
+const BACKGROUND_IMAGE = "https://i.imgur.com/EfUXRhd.png"; 
 const COMPANY_LOGO = "https://imgur.com/tH8Cu4p.png"; 
 
 const TIPOS_TRABAJO = [

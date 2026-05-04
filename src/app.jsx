@@ -7,7 +7,8 @@ import {
   Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
   Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
   ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon
+  Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon,
+  Percent, Shield, FileSpreadsheet, Folder, Loader2
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { initializeApp } from 'firebase/app';
@@ -46,6 +47,9 @@ const COLORS_TRABAJO = {
   "Supervisión de Puesta en Marcha": "#06b6d4", "Desmontaje de Transformador": "#c2410c", "Análisis de Aceite": "#64748b", "Vacaciones": "#38bdf8", "Estudios Médicos": "#f43f5e", "Otro": "#94a3b8"
 };
 
+// Validamos qué trabajos requieren ensayos
+const REQUIRES_TESTS_TYPES = ["Montaje de Transformador", "Supervisión de Montaje", "Servicio de Mantenimiento", "Ensayos Eléctricos (Únicamente)"];
+
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -55,7 +59,8 @@ const formatDate = (dateStr) => {
     return dateStr;
 };
 
-// NOTA: Pega aquí todo tu array original de PRELOADED_LOCATIONS completo. Lo comprimí para que el código entre entero.
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
 const PRELOADED_LOCATIONS = [
   { lat: -34.6037, lng: -58.3816, popupContent: '<b>Cliente: Edesur S.A.</b><br>' },
   { lat: -37.3782, lng: -64.6042, popupContent: '<b>General Acha, La Pampa</b>' },
@@ -278,20 +283,629 @@ const GlobalStyles = () => (
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
-  const sizeClasses = size === 'lg' ? 'max-w-4xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
+  const sizeClasses = size === 'full' ? 'w-full h-full max-w-none max-h-none rounded-none' : size === 'lg' ? 'max-w-4xl' : size === 'xl' ? 'max-w-6xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
-      <div className={`bg-white rounded-2xl shadow-2xl w-full ${sizeClasses} overflow-hidden animate-in flex flex-col max-h-[90vh]`}>
-        <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-0 md:p-4 backdrop-blur-sm transition-all">
+      <div className={`bg-white shadow-2xl w-full ${sizeClasses} overflow-hidden animate-in flex flex-col ${size === 'full' ? '' : 'rounded-2xl max-h-[90vh]'}`}>
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
           <h3 className="text-lg font-bold text-slate-800">{title}</h3>
           <button type="button" onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
+        <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50">{children}</div>
       </div>
     </div>
   );
 };
 
+// ============================================================================
+// MODULO DE ENSAYOS (PLANILLA)
+// ============================================================================
+
+const TestSheetEditor = ({ testData, onSave, onBack }) => {
+  const [activeTab, setActiveTab] = useState('ttr');
+  const [tapRange, setTapRange] = useState(testData.tapRange || 5);
+  const [data, setData] = useState(testData.data || {});
+  const [tgDeltaData, setTgDeltaData] = useState(testData.tgDeltaData || [
+    { id: generateId() }, { id: generateId() }, { id: generateId() }, { id: generateId() }
+  ]);
+  const [insulationData, setInsulationData] = useState(testData.insulationData ||
+    Array(6).fill(null).map(() => ({ id: generateId() }))
+  );
+  const [headerInfo, setHeaderInfo] = useState(testData.headerInfo || {
+    manufacturingNumber: '', serialNumber: '', client: '', date: new Date().toISOString().split('T')[0]
+  });
+  const [resistanceSettings, setResistanceSettings] = useState(testData.resistanceSettings || {
+    measuredTemp: '20', refTemp: '75', conn1Name: 'Conexión 1', conn2Name: 'Conexión 2', conn3Name: 'Conexión 3'
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setIsSaving(true);
+    const updatedTest = {
+      ...testData,
+      tapRange, data, tgDeltaData, insulationData, headerInfo, resistanceSettings,
+      lastModified: new Date().toISOString()
+    };
+    const timeoutId = setTimeout(() => {
+      onSave(updatedTest).then(() => setIsSaving(false));
+    }, 1500); 
+    return () => clearTimeout(timeoutId);
+  }, [tapRange, data, tgDeltaData, insulationData, headerInfo, resistanceSettings]);
+
+  useEffect(() => {
+    const loadScript = (src) => {
+      if (document.querySelector(`script[src="${src}"]`)) return;
+      const script = document.createElement('script');
+      script.src = src; script.async = true;
+      document.body.appendChild(script);
+    };
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+  }, []);
+
+  const tapRows = useMemo(() => {
+    const rows = [];
+    for (let i = tapRange; i >= 1; i--) rows.push({ id: `pos-${i}`, label: `+${i}` });
+    rows.push({ id: 'neutral', label: '0 (Nominal)' });
+    for (let i = 1; i <= tapRange; i++) rows.push({ id: `neg-${i}`, label: `-${i}` });
+    return rows;
+  }, [tapRange]);
+
+  const handleInputChange = (id, field, value) => {
+    const valWithComma = value.replace('.', ',');
+    setData(prev => ({ ...prev, [id]: { ...prev[id], [field]: valWithComma } }));
+  };
+
+  const handleTgDeltaChange = (id, field, value) => {
+    const valFormatted = (field === 'testVoltage' || field === 'tgPercent' || field === 'capacitance')
+      ? value.replace('.', ',') : value;
+    setTgDeltaData(prev => prev.map(row => row.id === id ? { ...row, [field]: valFormatted } : row));
+  };
+  const addTgDeltaRow = () => setTgDeltaData(prev => [...prev, { id: generateId() }]);
+  const removeTgDeltaRow = (id) => { if (confirm('¿Borrar fila?')) setTgDeltaData(prev => prev.filter(row => row.id !== id)); };
+
+  const handleInsulationChange = (id, field, value) => {
+    const numericFields = ['val30s', 'val1m', 'val2m', 'val3m', 'val4m', 'val5m', 'val6m', 'val7m', 'val8m', 'val9m', 'val10m'];
+    const valFormatted = numericFields.includes(field) ? value.replace('.', ',') : value;
+    setInsulationData(prev => prev.map(row => row.id === id ? { ...row, [field]: valFormatted } : row));
+  };
+  const addInsulationRow = () => setInsulationData(prev => [...prev, { id: generateId() }]);
+  const removeInsulationRow = (id) => { if (confirm('¿Borrar fila?')) setInsulationData(prev => prev.filter(row => row.id !== id)); };
+
+  const parseNum = (val) => val ? parseFloat(String(val).replace(',', '.')) : 0;
+  const formatNum = (val, decimals = 3) => (val === null || val === undefined || isNaN(val)) ? '-' : val.toFixed(decimals).replace('.', ',');
+
+  const calculateDeviation = (measured, rated) => {
+    const m = parseNum(measured); const r = parseNum(rated);
+    if (isNaN(m) || isNaN(r) || r === 0) return null;
+    return ((m - r) / r) * 100;
+  };
+
+  const calculateResistanceCorrection = (measuredVal) => {
+    const m = parseNum(measuredVal);
+    const t_meas = parseNum(resistanceSettings.measuredTemp);
+    const t_ref = parseNum(resistanceSettings.refTemp);
+    if (isNaN(m) || isNaN(t_meas) || isNaN(t_ref)) return null;
+    return m * ((235 + t_ref) / (235 + t_meas));
+  };
+
+  const calculateDAR = (val1m, val30s) => {
+    const v1 = parseNum(val1m); const v30 = parseNum(val30s);
+    if (v30 === 0 || isNaN(v1) || isNaN(v30)) return null;
+    return v1 / v30;
+  };
+  const calculatePI = (val10m, val1m) => {
+    const v10 = parseNum(val10m); const v1 = parseNum(val1m);
+    if (v1 === 0 || isNaN(v10) || isNaN(v1)) return null;
+    return v10 / v1;
+  };
+
+  const getStatusTTR = (deviation) => {
+    if (deviation === null) return { color: 'bg-gray-50 text-gray-400 print:text-gray-400', icon: null };
+    const absDev = Math.abs(deviation);
+    if (absDev <= 0.5) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" /> };
+    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" /> };
+  };
+
+  const getStatusTG = (valStr) => {
+    if (!valStr) return { color: 'bg-white', icon: null };
+    const val = parseNum(valStr);
+    if (val < 0.5) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" /> };
+    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" /> };
+  };
+
+  const getStatusIP = (piValue) => {
+    if (piValue === null) return { color: 'bg-white', icon: null, label: '-' };
+    if (piValue > 1.0) return { color: 'bg-green-100 text-green-700 font-bold border-green-300 print:bg-gray-100 print:text-black print:border-gray-400', icon: <CheckCircle className="w-4 h-4 inline mr-1 text-green-600 print:hidden" />, label: 'ACEPTABLE' };
+    return { color: 'bg-red-100 text-red-700 font-bold border-red-300 print:bg-gray-200 print:text-black print:font-bold print:border-black', icon: <AlertCircle className="w-4 h-4 inline mr-1 text-red-600 print:text-black" />, label: 'NO ACEPTABLE' };
+  };
+
+  const handleDownloadExcel = () => {
+    if (!window.XLSX) return alert("Cargando librería Excel...");
+    const wb = window.XLSX.utils.book_new();
+    const ttrData = [
+      ["PLANILLA DE ENSAYOS - TTR"],
+      ["Cliente:", headerInfo.client, "Fecha:", headerInfo.date],
+      ["Nº Serie:", headerInfo.serialNumber, "Nº Fab:", headerInfo.manufacturingNumber],
+      [], ["Tap", "Ratio %", "Rated Ratio", "Ph A Meas", "Dev A %", "Ph B Meas", "Dev B %", "Ph C Meas", "Dev C %"]
+    ];
+    tapRows.forEach(row => {
+      const d = data[row.id] || {};
+      const devA = calculateDeviation(d.phaseA, d.ratedRatio);
+      const devB = calculateDeviation(d.phaseB, d.ratedRatio);
+      const devC = calculateDeviation(d.phaseC, d.ratedRatio);
+      ttrData.push([row.label, d.ratioPercent, d.ratedRatio, d.phaseA, devA !== null ? formatNum(devA) : "", d.phaseB, devB !== null ? formatNum(devB) : "", d.phaseC, devC !== null ? formatNum(devC) : ""]);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(ttrData), "TTR");
+
+    const resData = [
+      ["PLANILLA DE ENSAYOS - RESISTENCIA"],
+      [], ["Tap", `${resistanceSettings.conn1Name} (Meas)`, `${resistanceSettings.conn1Name} (Corr)`, `${resistanceSettings.conn2Name} (Meas)`, `${resistanceSettings.conn2Name} (Corr)`, `${resistanceSettings.conn3Name} (Meas)`, `${resistanceSettings.conn3Name} (Corr)`]
+    ];
+    tapRows.forEach(row => {
+      const d = data[row.id] || {};
+      const c1 = calculateResistanceCorrection(d.resConn1Meas); const c2 = calculateResistanceCorrection(d.resConn2Meas); const c3 = calculateResistanceCorrection(d.resConn3Meas);
+      resData.push([row.label, d.resConn1Meas, c1 !== null ? formatNum(c1, 4) : "", d.resConn2Meas, c2 !== null ? formatNum(c2, 4) : "", d.resConn3Meas, c3 !== null ? formatNum(c3, 4) : ""]);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(resData), "Resistencia");
+
+    const tgData = [
+      ["PLANILLA DE ENSAYOS - TANGENTE DELTA"],
+      [], ["Modo", "Inyección", "Medición", "Guarda", "Tensión Ensayo", "TG (%)", "Cx (pF)"]
+    ];
+    tgDeltaData.forEach(row => tgData.push([row.mode, row.injection, row.measurement, row.guard, row.testVoltage, row.tgPercent, row.capacitance]));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(tgData), "TG Delta");
+
+    const insData = [
+      ["PLANILLA DE ENSAYOS - RESISTENCIA DE AISLACIÓN (GΩ)"],
+      [], ["Inyección", "Medición", "Guarda", "30\"", "1'", "2'", "3'", "4'", "5'", "6'", "7'", "8'", "9'", "10'", "RAD (DAR)", "IP (PI)", "Estado IP"]
+    ];
+    insulationData.forEach(row => {
+      const dar = calculateDAR(row.val1m, row.val30s); const pi = calculatePI(row.val10m, row.val1m); const statusIP = getStatusIP(pi);
+      insData.push([row.injection, row.measurement, row.guard, row.val30s, row.val1m, row.val2m, row.val3m, row.val4m, row.val5m, row.val6m, row.val7m, row.val8m, row.val9m, row.val10m, dar !== null ? formatNum(dar, 2) : "", pi !== null ? formatNum(pi, 2) : "", statusIP.label]);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(insData), "Aislación");
+
+    window.XLSX.writeFile(wb, `Ensayo_${headerInfo.serialNumber || 'SN'}.xlsx`);
+  };
+
+  const handleDownloadPDF = () => {
+    const element = document.getElementById('printable-content');
+    if (!window.html2pdf) return alert("Cargando librería PDF...");
+    document.body.classList.add('generating-pdf');
+    const opt = { margin: 5, filename: `Ensayo_${headerInfo.serialNumber || 'SN'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
+    window.html2pdf().set(opt).from(element).save().then(() => document.body.classList.remove('generating-pdf'));
+  };
+
+  return (
+    <div className="animate-in fade-in duration-300 w-full bg-white rounded-xl shadow-inner border border-slate-200">
+      <style>{`
+        @media print { @page { size: landscape; margin: 10mm; } .no-print { display: none !important; } .print-border { border: 1px solid #000 !important; } }
+        body.generating-pdf input, body.generating-pdf select { border: none !important; background: transparent !important; padding: 0 !important; text-align: center; appearance: none; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .ensayo-input { border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; width: 100%; padding: 4px; font-size: 12px; }
+        .ensayo-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+      `}</style>
+
+      <div className="bg-slate-800 text-white p-3 flex items-center justify-between rounded-t-xl sticky top-0 z-50 no-print" data-html2canvas-ignore="true">
+        <div className="flex items-center gap-4">
+          {onBack && (
+            <button onClick={onBack} className="flex items-center gap-2 hover:bg-slate-700 px-3 py-1.5 rounded transition font-bold text-sm">
+              <ArrowLeft size={16} /> Volver a Ensayos
+            </button>
+          )}
+          <div className="h-6 w-px bg-slate-600"></div>
+          <div>
+            <h2 className="font-bold text-sm">{headerInfo.client || 'Sin Cliente'}</h2>
+            <p className="text-xs text-slate-400">SN: {headerInfo.serialNumber || '---'}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 items-center">
+          {isSaving ? (
+            <span className="text-xs text-amber-400 flex items-center gap-1 font-bold"><Loader2 size={14} className="animate-spin" /> Guardando...</span>
+          ) : (
+            <span className="text-xs text-emerald-400 flex items-center gap-1 font-bold"><Cloud size={14} /> Guardado</span>
+          )}
+        </div>
+      </div>
+
+      <div id="printable-content" className="max-w-[1400px] mx-auto p-4 bg-slate-50 min-h-[70vh] print:bg-white print:p-0 rounded-b-xl text-slate-800">
+        <header className="bg-white shadow-sm rounded-lg p-5 mb-4 border-l-4 border-blue-600 print:shadow-none print:border-none print:mb-2 print:p-0">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div className="w-full">
+              <h1 className="text-xl font-bold text-slate-800 print:text-black mb-1">Planilla de Ensayos Eléctricos</h1>
+              <p className="text-slate-500 print:text-slate-700 mb-4 text-xs uppercase tracking-wide font-bold">
+                {activeTab === 'ttr' ? 'Relación de Transformación (TTR)' : activeTab === 'resistance' ? 'Resistencia de Devanados' : activeTab === 'tgdelta' ? 'Factor de Potencia / TG Delta' : 'Resistencia de Aislación'}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-white print:border-black print:border-2 print:p-2 text-sm">
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nº Fabricación</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold uppercase text-xs" value={headerInfo.manufacturingNumber} onChange={(e) => setHeaderInfo({ ...headerInfo, manufacturingNumber: e.target.value })} /></div>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nº Serie</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded font-bold uppercase text-xs" value={headerInfo.serialNumber} onChange={(e) => setHeaderInfo({ ...headerInfo, serialNumber: e.target.value })} /></div>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cliente / Proyecto</label><input type="text" className="w-full p-1.5 bg-white border border-slate-300 rounded uppercase text-xs font-medium" value={headerInfo.client} onChange={(e) => setHeaderInfo({ ...headerInfo, client: e.target.value })} /></div>
+                <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fecha</label><input type="date" className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs font-medium" value={headerInfo.date} onChange={(e) => setHeaderInfo({ ...headerInfo, date: e.target.value })} /></div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 no-print min-w-[160px]" data-html2canvas-ignore="true">
+              <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow text-xs uppercase font-bold tracking-wide w-full justify-center"><Download size={16} /> Exportar PDF</button>
+              <button onClick={handleDownloadExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow text-xs uppercase font-bold tracking-wide w-full justify-center"><FileSpreadsheet size={16} /> Exportar Excel</button>
+            </div>
+          </div>
+        </header>
+
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200 mb-4 no-print flex flex-wrap items-center gap-4" data-html2canvas-ignore="true">
+          {(activeTab === 'ttr' || activeTab === 'resistance') && (
+            <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Taps (+/-)</label>
+                <select value={tapRange} onChange={(e) => setTapRange(parseInt(e.target.value))} className="block w-24 border-slate-300 rounded border p-1 text-xs bg-slate-50 font-bold">
+                  {[...Array(17).keys()].map(num => <option key={num} value={num}>+/- {num}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+          <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto">
+            <button onClick={() => setActiveTab('ttr')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'ttr' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Zap size={14} /> TTR</button>
+            <button onClick={() => setActiveTab('resistance')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'resistance' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Activity size={14} /> Resistencia</button>
+            <button onClick={() => setActiveTab('tgdelta')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'tgdelta' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Percent size={14} /> TG Delta</button>
+            <button onClick={() => setActiveTab('insulation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'insulation' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Shield size={14} /> Aislación</button>
+          </div>
+        </div>
+
+        {activeTab === 'ttr' && (
+          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
+                    <th colSpan="3" className="py-2 px-2 border-r border-slate-600 print:border-black text-center font-bold text-[10px] uppercase">Referencia</th>
+                    <th colSpan="6" className="py-2 px-2 text-center font-bold bg-blue-900 print:bg-slate-300 print:text-black text-[10px] uppercase">Mediciones (3 Fases)</th>
+                  </tr>
+                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
+                    <th className="py-2 px-1 w-12 border-r border-slate-300 print:border-black">Tap</th>
+                    <th className="py-2 px-1 w-20 border-r border-slate-300 print:border-black">Ratio %</th>
+                    <th className="py-2 px-1 w-24 border-r border-slate-400 print:border-black bg-amber-50 print:bg-white">Teórico</th>
+                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase A</th>
+                    <th className="py-2 px-1 w-16 border-r border-slate-300 print:border-black bg-blue-50 print:bg-white">Dev A</th>
+                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase B</th>
+                    <th className="py-2 px-1 w-16 border-r border-slate-300 print:border-black bg-blue-50 print:bg-white">Dev B</th>
+                    <th className="py-2 px-1 w-24 bg-blue-50 print:bg-white border-r print:border-black">Fase C</th>
+                    <th className="py-2 px-1 w-16 bg-blue-50 print:bg-white">Dev C</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tapRows.map((row, index) => {
+                    const rowData = data[row.id] || {};
+                    const devA = calculateDeviation(rowData.phaseA, rowData.ratedRatio);
+                    const devB = calculateDeviation(rowData.phaseB, rowData.ratedRatio);
+                    const devC = calculateDeviation(rowData.phaseC, rowData.ratedRatio);
+                    const statusA = getStatusTTR(devA); const statusB = getStatusTTR(devB); const statusC = getStatusTTR(devC);
+                    return (
+                      <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200 print:border-slate-300`}>
+                        <td className="py-1 px-2 border-r border-slate-300 print:border-black text-center font-bold text-slate-700">{row.label}</td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input" value={rowData.ratioPercent || ''} onChange={(e) => handleInputChange(row.id, 'ratioPercent', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-amber-50/50 print:bg-white"><input type="text" inputMode="decimal" className="ensayo-input font-bold" value={rowData.ratedRatio || ''} onChange={(e) => handleInputChange(row.id, 'ratedRatio', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseA || ''} onChange={(e) => handleInputChange(row.id, 'phaseA', e.target.value)} /></td>
+                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${statusA.color} print:border text-[10px]`}>{statusA.icon} {devA !== null ? formatNum(devA) : '-'}%</td>
+                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseB || ''} onChange={(e) => handleInputChange(row.id, 'phaseB', e.target.value)} /></td>
+                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${statusB.color} print:border text-[10px]`}>{statusB.icon} {devB !== null ? formatNum(devB) : '-'}%</td>
+                        <td className="py-1 px-1 border-r print:border-black border-slate-200"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.phaseC || ''} onChange={(e) => handleInputChange(row.id, 'phaseC', e.target.value)} /></td>
+                        <td className={`py-1 px-1 text-center ${statusC.color} print:border text-[10px]`}>{statusC.icon} {devC !== null ? formatNum(devC) : '-'}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'resistance' && (
+          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
+            <div className="bg-purple-50 p-2 border-b border-purple-200 grid grid-cols-1 md:grid-cols-2 gap-4 print:bg-white print:border-black print:border-b-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-purple-900">Temp. Observada:</span>
+                <input type="text" inputMode="decimal" value={resistanceSettings.measuredTemp} onChange={(e) => setResistanceSettings({ ...resistanceSettings, measuredTemp: e.target.value.replace('.', ',') })} className="w-16 p-1 border border-purple-300 rounded text-center font-bold text-xs" />
+                <span className="text-xs text-purple-800 font-bold">°C</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-purple-900">Temp. Referencia:</span>
+                <input type="text" inputMode="decimal" value={resistanceSettings.refTemp} onChange={(e) => setResistanceSettings({ ...resistanceSettings, refTemp: e.target.value.replace('.', ',') })} className="w-16 p-1 border border-purple-300 rounded text-center font-bold text-xs" />
+                <span className="text-xs text-purple-800 font-bold">°C</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] border-collapse text-xs">
+                <thead>
+                  <tr className="bg-purple-900 text-white print:bg-slate-300 print:text-black border-b print:border-black">
+                    <th className="py-2 px-2 border-r border-purple-700 print:border-black w-16 text-[10px]">POS</th>
+                    <th colSpan="2" className="py-1 px-2 border-r border-purple-700 print:border-black text-center"><input type="text" value={resistanceSettings.conn1Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn1Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 1" /></th>
+                    <th colSpan="2" className="py-1 px-2 border-r border-purple-700 print:border-black text-center"><input type="text" value={resistanceSettings.conn2Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn2Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 2" /></th>
+                    <th colSpan="2" className="py-1 px-2 text-center"><input type="text" value={resistanceSettings.conn3Name} onChange={(e) => setResistanceSettings({ ...resistanceSettings, conn3Name: e.target.value })} className="bg-transparent text-white print:text-black text-center font-bold text-[10px] w-full focus:outline-none" placeholder="Conexión 3" /></th>
+                  </tr>
+                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
+                    <th className="py-2 px-1 border-r border-slate-300 print:border-black">Tap</th>
+                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
+                    <th className="py-1 px-1 w-32 border-r border-slate-400 print:border-black bg-purple-50 print:bg-white">Corregido</th>
+                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
+                    <th className="py-1 px-1 w-32 border-r border-slate-400 print:border-black bg-purple-50 print:bg-white">Corregido</th>
+                    <th className="py-1 px-1 w-32 border-r border-slate-300 print:border-black">Medido</th>
+                    <th className="py-1 px-1 w-32 bg-purple-50 print:bg-white">Corregido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tapRows.map((row, index) => {
+                    const rowData = data[row.id] || {};
+                    const c1 = calculateResistanceCorrection(rowData.resConn1Meas); const c2 = calculateResistanceCorrection(rowData.resConn2Meas); const c3 = calculateResistanceCorrection(rowData.resConn3Meas);
+                    return (
+                      <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200 print:border-slate-300`}>
+                        <td className="py-1 px-2 border-r border-slate-300 print:border-black text-center font-bold text-slate-700">{row.label}</td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn1Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn1Meas', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c1 !== null ? formatNum(c1, 4) : '-'}</td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn2Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn2Meas', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-400 print:border-black bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c2 !== null ? formatNum(c2, 4) : '-'}</td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input" value={rowData.resConn3Meas || ''} onChange={(e) => handleInputChange(row.id, 'resConn3Meas', e.target.value)} /></td>
+                        <td className="py-1 px-1 bg-purple-50/30 text-center font-mono text-blue-800 font-bold">{c3 !== null ? formatNum(c3, 4) : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'tgdelta' && (
+          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] border-collapse text-xs">
+                <thead>
+                  <tr className="bg-orange-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
+                    <th rowSpan="2" className="py-2 px-3 border-r border-orange-700 print:border-black w-24 text-[10px]">MODO</th>
+                    <th colSpan="3" className="py-1 px-2 border-r border-orange-700 print:border-black text-center bg-orange-900 print:bg-slate-400 text-[10px]">CONEXIONES</th>
+                    <th rowSpan="2" className="py-2 px-2 border-r border-orange-700 print:border-black w-32 text-[10px]">TENSIÓN</th>
+                    <th rowSpan="2" className="py-2 px-2 border-r border-orange-700 print:border-black w-32 text-[10px]">TG (%)</th>
+                    <th rowSpan="2" className="py-2 px-2 w-32 text-[10px]">Cx (pF)</th>
+                    <th rowSpan="2" className="py-2 px-1 w-10 no-print"></th>
+                  </tr>
+                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
+                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-24">INYECCIÓN</th>
+                    <th className="py-1 px-1 border-r border-slate-300 print:border-black">MEDICIÓN</th>
+                    <th className="py-1 px-1 border-r border-slate-300 print:border-black">GUARDA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tgDeltaData.map((row) => {
+                    const status = getStatusTG(row.tgPercent);
+                    return (
+                      <tr key={row.id} className="bg-white border-b border-slate-200 print:border-slate-300">
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black">
+                          <select value={row.mode || ''} onChange={(e) => handleTgDeltaChange(row.id, 'mode', e.target.value)} className="ensayo-input border-none font-bold text-slate-700">
+                            <option value="">-</option><option value="UST">UST</option><option value="GST g">GST g</option><option value="GST-GND">GST-GND</option>
+                          </select>
+                        </td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black">
+                          <select value={row.injection || ''} onChange={(e) => handleTgDeltaChange(row.id, 'injection', e.target.value)} className="ensayo-input border-none font-medium">
+                            <option value="">-</option><option value="AT">AT</option><option value="MT">MT</option><option value="BT">BT</option>
+                          </select>
+                        </td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none" value={row.measurement || ''} onChange={(e) => handleTgDeltaChange(row.id, 'measurement', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none" value={row.guard || ''} onChange={(e) => handleTgDeltaChange(row.id, 'guard', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none font-bold" value={row.testVoltage || ''} onChange={(e) => handleTgDeltaChange(row.id, 'testVoltage', e.target.value)} /></td>
+                        <td className={`py-1 px-1 border-r border-slate-300 print:border-black text-center ${status.color} print:border`}><div className="flex items-center justify-center gap-1">{status.icon}<input type="text" inputMode="decimal" className="w-16 p-1 border-none bg-transparent text-center font-bold focus:outline-none text-xs" placeholder="%" value={row.tgPercent || ''} onChange={(e) => handleTgDeltaChange(row.id, 'tgPercent', e.target.value)} /></div></td>
+                        <td className="py-1 px-1 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none" placeholder="pF" value={row.capacitance || ''} onChange={(e) => handleTgDeltaChange(row.id, 'capacitance', e.target.value)} /></td>
+                        <td className="py-1 px-1 text-center no-print"><button onClick={() => removeTgDeltaRow(row.id)} className="text-slate-300 hover:text-rose-500 transition"><X size={14} /></button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 print:bg-white text-[10px] text-slate-500 flex justify-between items-center font-medium">
+              <span>* TG aceptable &lt; 0,5%</span>
+              <button onClick={addTgDeltaRow} className="flex items-center gap-1 text-orange-600 font-bold hover:text-orange-800 no-print"><Plus size={14} /> Fila</button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'insulation' && (
+          <div className="bg-white rounded-lg border border-slate-200 print:border-black animate-in fade-in">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] border-collapse text-xs">
+                <thead>
+                  <tr className="bg-teal-800 text-white print:bg-slate-300 print:text-black border-b print:border-black">
+                    <th colSpan="3" className="py-1 px-2 border-r border-teal-700 print:border-black text-center bg-teal-900 print:bg-slate-400 text-[10px]">CONEXIÓN</th>
+                    <th colSpan="11" className="py-1 px-2 border-r border-teal-700 print:border-black text-center text-[10px]">RESULTADOS (GΩ)</th>
+                    <th colSpan="3" className="py-1 px-2 border-r border-teal-700 print:border-black text-center bg-teal-900 print:bg-slate-400 text-[10px]">ÍNDICES</th>
+                    <th rowSpan="2" className="py-1 px-1 w-8 no-print"></th>
+                  </tr>
+                  <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold text-center border-b-2 border-slate-300 print:border-black print:text-black">
+                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">INY</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">MED</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-16">GDA</th>
+                    {['30"',"1'","2'","3'","4'","5'","6'","7'","8'","9'","10'"].map(t=><th key={t} className="py-1 px-1 border-r border-slate-300 print:border-black w-10">{t}</th>)}
+                    <th className="py-1 px-1 border-r border-slate-300 print:border-black w-12 bg-amber-50 print:bg-white">RAD</th><th className="py-1 px-1 border-r border-slate-300 print:border-black w-12 bg-amber-50 print:bg-white">IP</th><th className="py-1 px-1 w-24 bg-slate-50 print:bg-white">Estado IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insulationData.map((row) => {
+                    const dar = calculateDAR(row.val1m, row.val30s); const pi = calculatePI(row.val10m, row.val1m); const statusIP = getStatusIP(pi);
+                    return (
+                      <tr key={row.id} className="bg-white border-b border-slate-200 print:border-slate-300">
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><select value={row.injection || ''} onChange={(e) => handleInsulationChange(row.id, 'injection', e.target.value)} className="ensayo-input border-none font-bold text-[10px]"><option value="">-</option><option value="AT">AT</option><option value="MT">MT</option><option value="BT">BT</option></select></td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none text-[10px]" value={row.measurement || ''} onChange={(e) => handleInsulationChange(row.id, 'measurement', e.target.value)} /></td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black"><input type="text" className="ensayo-input border-none text-[10px]" value={row.guard || ''} onChange={(e) => handleInsulationChange(row.id, 'guard', e.target.value)} /></td>
+                        {['val30s','val1m','val2m','val3m','val4m','val5m','val6m','val7m','val8m','val9m','val10m'].map(f=>(<td key={f} className="py-1 px-0.5 border-r border-slate-300 print:border-black"><input type="text" inputMode="decimal" className="ensayo-input border-none text-[10px] p-0" value={row[f] || ''} onChange={(e) => handleInsulationChange(row.id, f, e.target.value)} /></td>))}
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black bg-amber-50/50 text-center font-bold text-[10px] text-blue-800">{dar !== null ? formatNum(dar, 2) : '-'}</td>
+                        <td className="py-1 px-1 border-r border-slate-300 print:border-black bg-amber-50/50 text-center font-bold text-[10px] text-blue-800">{pi !== null ? formatNum(pi, 2) : '-'}</td>
+                        <td className={`py-1 px-1 text-center font-bold text-[9px] uppercase ${statusIP.color} print:border-black print:border`}><div className="flex items-center justify-center gap-1">{statusIP.icon}<span>{statusIP.label}</span></div></td>
+                        <td className="py-1 px-1 text-center no-print"><button onClick={() => removeInsulationRow(row.id)} className="text-slate-300 hover:text-rose-500 transition"><X size={12} /></button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 print:bg-white text-[10px] text-slate-500 flex justify-between items-center font-medium">
+              <span>* IP Aceptable &gt; 1.0</span>
+              <button onClick={addInsulationRow} className="flex items-center gap-1 text-teal-600 font-bold hover:text-teal-800 no-print"><Plus size={14} /> Fila</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Componente intermediario para listar/crear ensayos de un servicio
+const ServiceTestsManager = ({ service, onUpdateService, onClose }) => {
+  const [activeTest, setActiveTest] = useState(null);
+  const maxTrafos = service.cantidadTrafos || 1;
+  const tests = service.ensayos || [];
+
+  const handleSaveTest = async (updatedTest) => {
+    let newTests = [...tests];
+    const index = newTests.findIndex(t => t.id === updatedTest.id);
+    if (index >= 0) newTests[index] = updatedTest;
+    else newTests.push(updatedTest);
+    
+    await onUpdateService({ ensayos: newTests });
+  };
+
+  const handleCreateTest = () => {
+    if (tests.length >= maxTrafos) {
+      alert("Ya se alcanzó la cantidad máxima de transformadores configurada para este servicio.");
+      return;
+    }
+    const newTest = {
+      id: generateId(), lastModified: new Date().toISOString(), tapRange: 5,
+      headerInfo: { manufacturingNumber: service.trafoFabricacion||'', serialNumber: service.trafoSerie||'', client: service.cliente||'', date: new Date().toISOString().split('T')[0] },
+      data: {}, resistanceSettings: { measuredTemp: '20', refTemp: '75', conn1Name: 'Conexión 1', conn2Name: 'Conexión 2', conn3Name: 'Conexión 3' },
+      tgDeltaData: Array(4).fill(null).map(() => ({ id: generateId() })),
+      insulationData: Array(6).fill(null).map(() => ({ id: generateId() }))
+    };
+    setActiveTest(newTest);
+  };
+
+  const handleDeleteTest = async (testId, e) => {
+    e.stopPropagation();
+    if (window.confirm("¿Seguro que deseas eliminar esta planilla?")) {
+      const newTests = tests.filter(t => t.id !== testId);
+      await onUpdateService({ ensayos: newTests });
+    }
+  };
+
+  if (activeTest) {
+    return <TestSheetEditor testData={activeTest} onSave={handleSaveTest} onBack={() => setActiveTest(null)} />;
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto py-4">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <h3 className="font-bold text-lg text-slate-800 flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2 text-teal-600"/> Ensayos del Servicio</h3>
+          <p className="text-xs text-slate-500 mt-1">Transformadores ensayados: <b>{tests.length} de {maxTrafos}</b> permitidos.</p>
+        </div>
+        {tests.length < maxTrafos && (
+          <button onClick={handleCreateTest} className="bg-teal-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-teal-700 transition flex items-center text-sm shadow-md active:scale-95">
+            <Plus className="w-4 h-4 mr-1"/> Nueva Planilla
+          </button>
+        )}
+      </div>
+
+      {tests.length === 0 ? (
+        <div className="text-center p-12 text-slate-400 italic bg-white/50 rounded-xl border border-dashed border-slate-200">
+          Aún no se han cargado planillas de ensayo para este servicio.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {tests.map(t => (
+            <div key={t.id} onClick={() => setActiveTest(t)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 cursor-pointer hover:border-teal-400 hover:shadow-md transition-all group relative">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-[10px] font-bold bg-teal-50 text-teal-700 px-2 py-1 rounded uppercase tracking-wider">Planilla TTR/Res/TG/Aisl</span>
+                <button onClick={(e) => handleDeleteTest(t.id, e)} className="text-slate-300 hover:text-rose-500 transition-colors p-1"><Trash2 className="w-4 h-4"/></button>
+              </div>
+              <h4 className="font-black text-slate-800 text-lg leading-tight mb-1">SN: {t.headerInfo.serialNumber || 'Sin especificar'}</h4>
+              <p className="text-xs text-slate-500 mb-3">Fabricación: {t.headerInfo.manufacturingNumber || '-'}</p>
+              <div className="flex items-center text-[10px] text-slate-400 font-medium">
+                <Clock className="w-3 h-3 mr-1"/> Modificado: {new Date(t.lastModified).toLocaleString()}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Panel global de ensayos para Administrador
+const EnsayosDashboard = ({ services }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const allTests = useMemo(() => {
+    return services.flatMap(s => (s.ensayos || []).map(t => ({
+      ...t, 
+      serviceId: s.id, 
+      serviceOci: s.oci, 
+      serviceCliente: s.cliente,
+      serviceDate: s.fInicio
+    }))).sort((a,b) => new Date(b.lastModified) - new Date(a.lastModified));
+  }, [services]);
+
+  const filteredTests = allTests.filter(t => 
+    (t.headerInfo.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.serviceCliente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.serviceOci || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in h-full flex flex-col">
+      <div className="bg-white/95 p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-sm shrink-0">
+        <div>
+            <h3 className="text-lg font-bold flex items-center text-slate-800"><FileSpreadsheet className="w-5 h-5 mr-3 text-teal-600"/> Base de Datos de Ensayos</h3>
+            <p className="text-xs text-slate-500 font-medium mt-1">Registro global de planillas eléctricas</p>
+        </div>
+        <div className="flex w-full md:w-auto flex-1 max-w-md relative">
+            <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400"/>
+            <input type="text" placeholder="Buscar por Cliente, OCI o Serie..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-teal-100 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex-1 overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1 custom-scrollbar">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <thead className="bg-slate-50 sticky top-0 z-10">
+                    <tr>
+                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Cliente / OCI</th>
+                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Transformador</th>
+                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Fecha Servicio</th>
+                        <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Última Modificación</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                    {filteredTests.map((t, idx) => (
+                        <tr key={`${t.id}-${idx}`} className="hover:bg-teal-50/30 transition-colors">
+                            <td className="px-6 py-4">
+                                <div className="font-bold text-slate-800">{t.serviceCliente}</div>
+                                <div className="text-xs font-mono text-slate-500">OCI: {t.serviceOci}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                                <div className="font-bold text-slate-700">SN: {t.headerInfo.serialNumber || 'S/N'}</div>
+                                <div className="text-[10px] text-slate-500">FAB: {t.headerInfo.manufacturingNumber || '-'}</div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-600 font-medium">{formatDate(t.serviceDate)}</td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{new Date(t.lastModified).toLocaleString()}</td>
+                        </tr>
+                    ))}
+                    {filteredTests.length === 0 && <tr><td colSpan="4" className="text-center py-12 text-slate-400 italic">No se encontraron ensayos.</td></tr>}
+                </tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+// ============================================================================
+
+
+// ... (CÓDIGO ANTERIOR DE ENCUESTAS, DASHBOARDS, MAPA, KANBAN, ETC.) ...
+// (Se mantienen igual que en tu código original)
 const surveyQuestionsData = [
     { id: 'q1', title: '1. Califique la atención que el servicio de post venta le brindo previo a iniciar los trabajos.', obsLabel: 'Observaciones (Atención previa)' },
     { id: 'q2', title: '2. Califique la coordinación y cumplimiento en la ejecución de los trabajos en sitio.', obsLabel: 'Observaciones (Coordinación y ejecución)' },
@@ -1551,11 +2165,18 @@ const ServiceSheet = ({ mode = 'operations', sortedServices, handleEdit, handleD
 
 const TransformerHistory = ({ services }) => {
     const [searchSerial, setSearchSerial] = useState("");
+    const [managingTestsService, setManagingTestsService] = useState(null);
+
     const history = useMemo(() => { 
         if (!searchSerial) return []; 
         return services.filter(s => (s.trafoSerie && s.trafoSerie.toLowerCase().includes(searchSerial.toLowerCase())) || (s.trafoFabricacion && s.trafoFabricacion.toLowerCase().includes(searchSerial.toLowerCase()))); 
     }, [searchSerial, services]);
     const displayHistory = searchSerial ? history : services.sort((a,b) => new Date(b.fInicio) - new Date(a.fInicio)).slice(0, 5);
+
+    const handleUpdateServiceTests = async (testUpdates) => {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingTestsService.id), testUpdates);
+        setManagingTestsService(prev => ({...prev, ...testUpdates}));
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -1581,6 +2202,15 @@ const TransformerHistory = ({ services }) => {
                                 <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/> {formatDate(srv.fInicio)}</span>
                                 <span className="flex items-center font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">OCI: {srv.oci}</span>
                             </div>
+                            
+                            {srv.ensayos && srv.ensayos.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <button onClick={() => setManagingTestsService(srv)} className="flex items-center text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg hover:bg-teal-100 transition-colors">
+                                        <FileSpreadsheet className="w-4 h-4 mr-2"/> Ver Ensayos Eléctricos ({srv.ensayos.length})
+                                    </button>
+                                </div>
+                            )}
+
                             <TechReportViewer service={srv} />
                         </div>
                     ))}
@@ -1588,6 +2218,10 @@ const TransformerHistory = ({ services }) => {
             ) : (
                 <div className="text-center p-12 text-slate-400 italic bg-white rounded-xl border border-dashed border-slate-200">No se encontraron servicios con ese número de serie o fabricación.</div>
             )}
+
+            <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Gestión de Ensayos" size="xl">
+                {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
+            </Modal>
         </div>
     );
 };
@@ -1596,10 +2230,14 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
     const [view, setView] = useState('list'); 
     const [hideCompleted, setHideCompleted] = useState(false);
     const [previewService, setPreviewService] = useState(null);
+    const [managingTestsService, setManagingTestsService] = useState(null);
 
     useEffect(() => {
         const handleBack = (e) => {
-            if (previewService) {
+            if (managingTestsService) {
+                e.preventDefault();
+                setManagingTestsService(null);
+            } else if (previewService) {
                 e.preventDefault(); 
                 setPreviewService(null); 
             } else if (view === 'gantt') {
@@ -1610,7 +2248,7 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
 
         window.addEventListener('app-back', handleBack);
         return () => window.removeEventListener('app-back', handleBack);
-    }, [previewService, view]);
+    }, [previewService, view, managingTestsService]);
 
     const myServices = useMemo(() => {
         let list = services.filter(s => s.tecnicos && s.tecnicos.includes(user.name));
@@ -1631,6 +2269,12 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
         const link = `${window.location.origin}${window.location.pathname}?survey=true&serviceId=${serviceId}`;
         navigator.clipboard.writeText(link);
         showNotification("Link de encuesta copiado al portapapeles", "success");
+    };
+
+    const handleUpdateServiceTests = async (testUpdates) => {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingTestsService.id), testUpdates);
+        setManagingTestsService(prev => ({...prev, ...testUpdates}));
+        showNotification("Ensayos actualizados");
     };
 
     return (
@@ -1692,7 +2336,9 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                             <div>
                                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center"><Wrench className="w-4 h-4 mr-2"/> Servicios de Campo</h3>
                                 <div className="grid grid-cols-1 gap-5">
-                                    {myServices.map(srv => (
+                                    {myServices.map(srv => {
+                                        const requiresTests = REQUIRES_TESTS_TYPES.includes(srv.tipoTrabajo);
+                                        return (
                                         <div key={srv.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow group/card">
                                             <div className="flex-1 cursor-pointer" onClick={() => setPreviewService(srv)}>
                                                 <div className="flex items-center gap-3 mb-3">
@@ -1730,6 +2376,9 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                     <>
                                                         <button onClick={(e) => handleShareSurvey(e, srv.id)} className="bg-emerald-50 text-emerald-700 border border-emerald-200 py-2 px-3 rounded-lg font-bold hover:bg-emerald-100 flex items-center justify-center text-xs transition-colors shadow-sm"><Share2 className="w-4 h-4 mr-2"/> Encuesta a Cliente</button>
                                                         <button onClick={() => { setUploadingEvidenceService(srv); setEvidenceData({comment: '', files: []}); }} className="bg-white text-blue-600 border border-blue-200 py-2 px-3 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center text-xs transition-colors"><ImageIcon className="w-4 h-4 mr-2"/> Subir Avance</button>
+                                                        {requiresTests && (
+                                                            <button onClick={() => setManagingTestsService(srv)} className="bg-white text-teal-600 border border-teal-200 py-2 px-3 rounded-lg font-bold hover:bg-teal-50 flex items-center justify-center text-xs transition-colors"><FileSpreadsheet className="w-4 h-4 mr-2"/> Cargar Ensayos</button>
+                                                        )}
                                                         <button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button>
                                                     </>
                                                 )}
@@ -1737,7 +2386,7 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                 {(srv.estado === 'Finalizado' || srv.estado === 'No Finalizado') && <button onClick={() => { setReopeningService(srv); setReopenReason(""); }} className="w-full py-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors flex items-center justify-center"><RotateCcw className="w-3 h-3 mr-1"/> Reabrir Caso</button>}
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             </div>
                         )}
@@ -1853,6 +2502,11 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                         )}
                     </div>
                 )}
+            </Modal>
+            
+            {/* Modal Especial para Ensayos */}
+            <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Gestión de Ensayos" size="xl">
+                {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
             </Modal>
         </div>
     );
@@ -2052,7 +2706,8 @@ export default function App() {
     const [formData, setFormData] = useState({
         oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
         tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-        progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
+        progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: '',
+        cantidadTrafos: 1
     });
 
     const [uploadingEvidenceService, setUploadingEvidenceService] = useState(null);
@@ -2091,7 +2746,7 @@ export default function App() {
         setFormData({
             oci: '', cliente: '', fSolicitud: new Date().toISOString().split('T')[0], fInicio: '', fFin: '', tipoTrabajo: TIPOS_TRABAJO[0], tipoTrabajoOtro: '',
             tecnicos: [], vehiculos: [], estado: 'Agendado', observaciones: '', postergado: false, motivoPostergacion: '', alcance: 'Nacional', files: [], 
-            progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: ''
+            progressLogs: [], dailyLogs: [], closureData: null, trafoFabricacion: '', trafoSerie: '', trafoPotencia: '', trafoRelacion: '', ubicacion: '', contactoResponsable: '', cantidadTrafos: 1
         });
     };
 
@@ -2258,7 +2913,8 @@ export default function App() {
             ...formData, 
             closureData: editingId ? (services.find(s=>s.id===editingId)?.closureData || null) : null,
             progressLogs: editingId ? (services.find(s=>s.id===editingId)?.progressLogs || []) : [],
-            dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : []
+            dailyLogs: editingId ? (services.find(s=>s.id===editingId)?.dailyLogs || []) : [],
+            ensayos: editingId ? (services.find(s=>s.id===editingId)?.ensayos || []) : []
         };
         if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', editingId), serviceData); showNotification("Servicio actualizado"); } 
         else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'services'), serviceData); showNotification("Servicio creado"); }
@@ -2353,10 +3009,19 @@ export default function App() {
                                     <input type="text" className="input-field mt-2 text-xs animate-in fade-in" placeholder="Especifique..." value={formData.tipoTrabajoOtro || ''} onChange={e=>setFormData({...formData, tipoTrabajoOtro: e.target.value})} />
                                 )}
                             </div>
+                            
+                            {REQUIRES_TESTS_TYPES.includes(formData.tipoTrabajo) && (
+                                <div className="form-group animate-in fade-in mt-2">
+                                    <label className="text-[10px] font-bold text-teal-600 mb-1 block flex items-center uppercase tracking-wider">
+                                        <FileSpreadsheet className="w-3 h-3 mr-1"/> Cant. de Transformadores (Ensayos)
+                                    </label>
+                                    <input type="number" min="1" className="input-field text-xs border-teal-200 focus:border-teal-500" value={formData.cantidadTrafos || 1} onChange={e=>setFormData({...formData, cantidadTrafos: parseInt(e.target.value) || 1})} />
+                                </div>
+                            )}
+
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (<div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">OCI</label><input className="input-field font-mono" value={formData.oci} onChange={e=>setFormData({...formData, oci:e.target.value})} placeholder="OCI"/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">CLIENTE</label><input className="input-field uppercase" value={formData.cliente} onChange={e=>setFormData({...formData, cliente:e.target.value.toUpperCase()})} placeholder="CLIENTE"/></div></div>)}
                             <div className="grid grid-cols-2 gap-2"><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">INICIO</label><input type="date" className="input-field text-xs" value={formData.fInicio} onChange={e=>setFormData({...formData, fInicio:e.target.value})}/></div><div className="form-group"><label className="text-xs font-bold text-slate-500 mb-1 block">FIN</label><input type="date" className="input-field text-xs" value={formData.fFin} onChange={e=>setFormData({...formData, fFin:e.target.value})}/></div></div>
                             
-                            {/* --- SECCIÓN ALCANCE Y FECHA SOLICITUD --- */}
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="form-group">
@@ -2380,7 +3045,6 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* --- SECCIÓN DATOS TRANSFORMADOR Y SITIO --- */}
                             {formData.tipoTrabajo !== 'Vacaciones' && formData.tipoTrabajo !== 'Estudios Médicos' && (
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-orange-200 transition-colors animate-in fade-in">
                                     <label className="text-xs font-bold text-orange-500 block mb-3 flex items-center"><Activity className="w-3 h-3 mr-1"/> DATOS TRANSFORMADOR Y SITIO</label>
@@ -2439,7 +3103,8 @@ export default function App() {
                                 {id:'vacations', label:'Vacaciones', icon:Palmtree},
                                 {id:'history', label:'Historial', icon:History},
                                 {id:'kpis', label:'KPIs', icon:BarChart2},
-                                {id:'surveys', label:'Encuestas', icon:ClipboardList} 
+                                {id:'surveys', label:'Encuestas', icon:ClipboardList},
+                                {id:'tests', label:'Ensayos', icon:FileSpreadsheet}
                             ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     )}
@@ -2531,6 +3196,7 @@ export default function App() {
                             {activeTab === 'history' && <TransformerHistory services={services} />}
                             {activeTab === 'kpis' && <KPIs services={services} vehiculosData={vehiculosData} />}
                             {activeTab === 'surveys' && <SurveyDashboard surveys={surveysData} />}
+                            {activeTab === 'tests' && <EnsayosDashboard services={services} />}
                         </div>
                     ) : (
                         <div className="max-w-7xl mx-auto h-full">
@@ -2543,10 +3209,7 @@ export default function App() {
 
                 {isAdmin && (
                     <button 
-                        onClick={() => {
-                            resetForm();
-                            setIsSidebarOpen(true);
-                        }}
+                        onClick={() => { resetForm(); setIsSidebarOpen(true); }}
                         className="lg:hidden fixed bottom-6 right-6 z-30 bg-orange-600 text-white p-4 rounded-full shadow-xl shadow-orange-300 hover:bg-orange-700 active:scale-95 transition-all"
                     >
                         <Plus className="w-6 h-6" />
@@ -2554,7 +3217,8 @@ export default function App() {
                 )}
             </div>
 
-            {/* --- MODAL PARA MANTENIMIENTO DE FLOTA --- */}
+            {/* MODALES CONFIGURACIÓN Y OPERATIVOS */}
+            {/* Modal de Mantenimiento */}
             <Modal isOpen={isMaintenanceModalOpen} onClose={()=>setIsMaintenanceModalOpen(false)} title={editingMaintenanceId ? 'Editar Mantenimiento' : 'Agendar Mantenimiento'}>
                 <form onSubmit={handleSaveMaintenance} className="space-y-4">
                     <div>
@@ -2612,7 +3276,6 @@ export default function App() {
                 </form>
             </Modal>
 
-            {/* MODALES CONFIGURACIÓN Y OPERATIVOS */}
             <Modal isOpen={isManageTechOpen} onClose={()=>setIsManageTechOpen(false)} title="Gestión de Personal y Flota" size="lg">
                 <div className="flex space-x-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
                     <button type="button" onClick={() => setManageTab('techs')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${manageTab === 'techs' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}>Técnicos y Claves</button>

@@ -2729,6 +2729,12 @@ export default function App() {
         setIsSidebarOpen(true);
     };
 
+    const handleEditMaintenance = (maintenanceItem) => {
+        // Mantenimiento de flota no tiene edición en el panel principal.
+        // Usamos una función vacía para evitar errores al hacer clic en el kanban.
+        console.log('Editar mantenimiento no implementado', maintenanceItem);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const serviceData = { 

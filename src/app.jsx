@@ -835,8 +835,11 @@ const ServiceTestsManager = ({ service, onUpdateService, onClose }) => {
 };
 
 // Panel global de ensayos para Administrador
+// Reemplaza ÚNICAMENTE este componente en tu código:
+
 const EnsayosDashboard = ({ services }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTest, setActiveTest] = useState(null); // <-- Estado para abrir el ensayo
   
   const allTests = useMemo(() => {
     return services.flatMap(s => (s.ensayos || []).map(t => ({
@@ -853,6 +856,19 @@ const EnsayosDashboard = ({ services }) => {
     (t.serviceCliente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.serviceOci || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // <-- Función para permitir editar/guardar desde este panel global
+  const handleSaveTest = async (updatedTest) => {
+    const service = services.find(s => s.id === updatedTest.serviceId);
+    if (!service) return;
+    const newTests = service.ensayos.map(t => t.id === updatedTest.id ? updatedTest : t);
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', service.id), { ensayos: newTests });
+  };
+
+  // <-- Renderiza el editor si hacemos clic en un ensayo
+  if (activeTest) {
+    return <TestSheetEditor testData={activeTest} onSave={handleSaveTest} onBack={() => setActiveTest(null)} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in h-full flex flex-col">
@@ -880,7 +896,11 @@ const EnsayosDashboard = ({ services }) => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                     {filteredTests.map((t, idx) => (
-                        <tr key={`${t.id}-${idx}`} className="hover:bg-teal-50/30 transition-colors">
+                        <tr 
+                            key={`${t.id}-${idx}`} 
+                            onClick={() => setActiveTest(t)} // <-- Abre el ensayo al hacer clic
+                            className="hover:bg-teal-50/30 transition-colors cursor-pointer" // <-- Cambia el cursor para indicar que es clickeable
+                        >
                             <td className="px-6 py-4">
                                 <div className="font-bold text-slate-800">{t.serviceCliente}</div>
                                 <div className="text-xs font-mono text-slate-500">OCI: {t.serviceOci}</div>

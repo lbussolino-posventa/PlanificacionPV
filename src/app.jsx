@@ -2649,7 +2649,7 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
 // MODULO DE ACTAS DE SERVICIO
 // ============================================================================
 
-// 1. Componente de Firma Digital (Canvas)
+// 1. Componente de Firma Digital (Canvas) - TAMAÑO AMPLIADO
 const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -2714,15 +2714,15 @@ const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
         <div className="flex flex-col items-center w-full">
             <canvas
                 ref={canvasRef}
-                width={300}
-                height={80}
+                width={320}  /* ANTES: 300 - Aumentado al máximo permitido por la grilla */
+                height={140} /* ANTES: 80 - Casi el doble de alto para más comodidad */
                 style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
-                className={`border-b border-black w-full max-w-[300px] ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
+                className={`border border-slate-300 border-b-black w-full max-w-[320px] rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
                 onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
                 onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
             />
             {!readOnly && (
-                <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-1 font-bold no-print underline">
+                <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
                     Limpiar firma
                 </button>
             )}

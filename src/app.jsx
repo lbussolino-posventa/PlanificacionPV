@@ -2730,10 +2730,12 @@ const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
     );
 };
 
-
 // 2. Componente Editor y Generador de PDF del Acta
 const ActaEditor = ({ service, actaData, onSave, onBack, readOnly = false }) => {
     const defaultDate = new Date();
+    const [viewMode, setViewMode] = useState('form'); // 'form' para celular, 'pdf' para vista previa A4
+    const [isGenerating, setIsGenerating] = useState(false);
+
     const [acta, setActa] = useState(actaData || {
         id: generateId(),
         nroActa: '',
@@ -2778,271 +2780,377 @@ const ActaEditor = ({ service, actaData, onSave, onBack, readOnly = false }) => 
         setIsSaving(false);
     };
 
+    // Usamos EXACTAMENTE tu lógica de descarga que funcionaba bien
     const handleDownloadPDF = () => {
         const element = document.getElementById('acta-printable');
         if (!window.html2pdf) return alert("Cargando librería PDF...");
-        document.body.classList.add('generating-pdf');
         
-        const opt = { 
-            margin: [10, 10, 10, 10], 
-            filename: `Acta_Servicio_${acta.oci}_${acta.nroActa || 'SN'}.pdf`, 
-            image: { type: 'jpeg', quality: 0.98 }, 
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' }, 
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
-        };
-        
-        window.html2pdf().set(opt).from(element).save().then(() => document.body.classList.remove('generating-pdf'));
+        setIsGenerating(true);
+        const previousMode = viewMode;
+        setViewMode('pdf');
+
+        setTimeout(() => {
+            document.body.classList.add('generating-pdf');
+            
+            const opt = { 
+                margin: [10, 10, 10, 10], 
+                filename: `Acta_Servicio_${acta.oci}_${acta.nroActa || 'SN'}.pdf`, 
+                image: { type: 'jpeg', quality: 0.98 }, 
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' }, 
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+            };
+            
+            window.html2pdf().set(opt).from(element).save().then(() => {
+                document.body.classList.remove('generating-pdf');
+                setViewMode(previousMode);
+                setIsGenerating(false);
+            });
+        }, 300);
+    };
+
+    const handleTextareaFocus = () => {
+        if (!acta.trabajosRealizados && !readOnly) {
+            handleChange('trabajosRealizados', '• ');
+        }
+    };
+
+    const handleTextareaKeyDown = (e) => {
+        if (readOnly) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const { selectionStart, selectionEnd, value } = e.target;
+            const newValue = value.substring(0, selectionStart) + '\n• ' + value.substring(selectionEnd);
+            handleChange('trabajosRealizados', newValue);
+            setTimeout(() => {
+                e.target.selectionStart = e.target.selectionEnd = selectionStart + 3;
+            }, 0);
+        }
     };
 
     return (
-        <div className="w-full bg-slate-200 p-4 rounded-xl">
-            <div className="flex justify-between items-center mb-4 no-print">
-                <button onClick={onBack} className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-white rounded font-bold text-sm hover:bg-slate-800"><ArrowLeft size={16} /> Volver</button>
-                <div className="flex gap-2">
-                    {!readOnly && <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded font-bold text-sm hover:bg-emerald-700 shadow">{isSaving ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>} Guardar Acta</button>}
-                    <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded font-bold text-sm hover:bg-rose-700 shadow"><Download size={16}/> Descargar PDF</button>
+        <div className="w-full bg-slate-200 p-2 md:p-4 rounded-xl">
+            {/* BOTONES SUPERIORES */}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 no-print gap-4">
+                <button onClick={onBack} className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-white rounded font-bold text-sm hover:bg-slate-800 w-full sm:w-auto justify-center"><ArrowLeft size={16} /> Volver</button>
+                
+                {/* SELECTOR DE VISTA (MODO CELULAR / MODO PDF) */}
+                <div className="flex bg-slate-300 p-1 rounded-lg w-full sm:w-auto">
+                    <button onClick={() => setViewMode('form')} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'form' ? 'bg-white shadow text-blue-600' : 'text-slate-600'}`}>📱 Modo Edición</button>
+                    <button onClick={() => setViewMode('pdf')} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'pdf' ? 'bg-white shadow text-rose-600' : 'text-slate-600'}`}>📄 Vista PDF</button>
+                </div>
+
+                <div className="flex gap-2 w-full sm:w-auto">
+                    {!readOnly && <button onClick={handleSave} disabled={isSaving || isGenerating} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded font-bold text-sm hover:bg-emerald-700 shadow">{isSaving ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>} Guardar</button>}
+                    <button onClick={handleDownloadPDF} disabled={isGenerating} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded font-bold text-sm hover:bg-rose-700 shadow">{isGenerating ? <Loader size={16} className="animate-spin"/> : <Download size={16}/>} PDF</button>
                 </div>
             </div>
 
-            {/* DOCUMENTO IMPRIMIBLE */}
-            <div id="acta-printable" className="mx-auto p-6 shadow-xl font-sans w-full max-w-[800px] h-auto min-h-[1050px] relative border border-slate-300 flex flex-col" style={{ backgroundColor: '#ffffff' }}>
-                
-                <style>{`
-                    #acta-printable * {
-                        color: #000000 !important;
-                        border-color: #000000 !important;
-                    }
-                    
-                    #acta-printable input[type="text"].acta-input,
-                    #acta-printable input[type="date"].acta-input {
-                        background: transparent !important;
-                        background-color: transparent !important;
-                        border-top: none !important;
-                        border-left: none !important;
-                        border-right: none !important;
-                        border-bottom: 1px dotted #000000 !important;
-                        border-radius: 0 !important;
-                        box-shadow: none !important;
-                        padding: 0 4px !important;
-                        margin: 0 !important;
-                        height: 20px !important;
-                        min-height: 0 !important;
-                        font-family: inherit !important;
-                        font-size: 13px !important;
-                        font-weight: normal !important;
-                    }
-
-                    #acta-printable input.acta-inline-input {
-                        display: inline-block !important;
-                        background: transparent !important;
-                        background-color: transparent !important;
-                        border-top: none !important;
-                        border-left: none !important;
-                        border-right: none !important;
-                        border-bottom: 1px solid #000000 !important;
-                        border-radius: 0 !important;
-                        box-shadow: none !important;
-                        margin: 0 4px !important;
-                        padding: 0 2px !important;
-                        font-family: inherit !important;
-                        font-size: 14px !important;
-                        font-weight: bold !important;
-                        vertical-align: baseline !important;
-                        line-height: normal !important;
-                        height: auto !important;
-                        text-align: center !important;
-                        appearance: none !important; 
-                        -webkit-appearance: none !important;
-                    }
-
-                    #acta-printable input.w-lugar { width: 140px !important; }
-                    #acta-printable input.w-dia { width: 40px !important; }
-                    #acta-printable input.w-mes { width: 100px !important; }
-                    #acta-printable input.w-anio { width: 60px !important; }
-                    #acta-printable input.w-rep { width: 220px !important; }
-                    #acta-printable input.w-nro { width: 70px !important; font-weight: bold !important; }
-
-                    /* ESTILOS DEL TEXTAREA Y EL DIV DE IMPRESIÓN */
-                    #acta-printable textarea,
-                    #acta-printable .print-div {
-                        background-color: transparent !important;
-                        border: 1px solid #000000 !important;
-                        border-radius: 0 !important;
-                        box-shadow: none !important;
-                        padding: 8px !important;
-                        font-size: 14px !important;
-                    }
-                    
-                    /* El Div de impresión solo se muestra cuando se exporta a PDF */
-                    #acta-printable .print-div {
-                        display: none !important;
-                    }
-
-                    body.generating-pdf .no-print { display: none !important; }
-                    
-                    /* Oculta los punteados de la cabecera al imprimir */
-                    body.generating-pdf #acta-printable input[type="text"].acta-input,
-                    body.generating-pdf #acta-printable input[type="date"].acta-input {
-                        border-bottom-color: transparent !important;
-                    }
-                    
-                    /* Intercambio de Textarea a Div al generar PDF */
-                    body.generating-pdf #acta-printable textarea {
-                        display: none !important;
-                    }
-                    body.generating-pdf #acta-printable .print-div {
-                        display: block !important;
-                    }
-
-                    .pdf-checkbox { width: 14px !important; height: 14px !important; border: 1px solid #000 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-weight: bold !important; cursor: pointer !important; font-size: 12px !important; margin-right: 4px !important;}
-                `}</style>
-                
-                {/* ENCABEZADO CARÁTULA */}
-                <table className="w-full border-collapse border border-black mb-4">
-                    <tbody>
-                        <tr>
-                            <td className="w-1/4 border border-black p-1 text-center align-middle h-16">
-                                <img src={COMPANY_LOGO} alt="TTE Logo" className="max-h-12 mx-auto object-contain" crossOrigin="anonymous" />
-                            </td>
-                            <td className="w-1/2 border border-black p-1 text-center align-middle">
-                                <div className="font-bold text-lg tracking-wide">SERVICIO POSVENTA</div>
-                                <div className="font-bold text-lg tracking-wide mt-1">ACTA DE SERVICIO</div>
-                            </td>
-                            <td className="w-1/4 border border-black p-2 align-middle text-left relative">
-                                <div className="mb-2 text-md font-bold">R-GI-SPV-1</div>
-                                <div className="flex items-center text-xs font-bold">
-                                    Nº <input type="text" className="acta-inline-input w-nro" placeholder="........" value={acta.nroActa} onChange={e=>handleChange('nroActa', e.target.value)} readOnly={readOnly}/>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                {/* BLOQUE DE DATOS */}
-                <div className="grid grid-cols-2 gap-y-0.5 gap-x-8 mb-4 uppercase text-[12px] font-bold">
-                    <div className="flex items-end"><span className="w-28 pb-0.5">CLIENTE:</span> <input type="text" className="acta-input flex-1" value={acta.cliente} onChange={e=>handleChange('cliente', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">TRAFO:</span> <input type="text" className="acta-input flex-1" value={acta.trafo} onChange={e=>handleChange('trafo', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">LUGAR:</span> <input type="text" className="acta-input flex-1" value={acta.lugar} onChange={e=>handleChange('lugar', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">POTENCIA:</span> <input type="text" className="acta-input flex-1" value={acta.potencia} onChange={e=>handleChange('potencia', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">OBRA:</span> <input type="text" className="acta-input flex-1" value={acta.obra} onChange={e=>handleChange('obra', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">RELACIÓN:</span> <input type="text" className="acta-input flex-1" value={acta.relacion} onChange={e=>handleChange('relacion', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5 whitespace-nowrap">OCI / CONTRATO:</span> <input type="text" className="acta-input flex-1" value={acta.oci} onChange={e=>handleChange('oci', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">MARCA:</span> <span className="flex-1 border-b border-dotted border-black font-normal px-1 h-[20px] flex items-end pb-0.5">TTE</span></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">COMIENZO:</span> <input type="date" className="acta-input flex-1" value={acta.fComienzo} onChange={e=>handleChange('fComienzo', e.target.value)} readOnly={readOnly}/></div>
-                    <div className="flex items-end"><span className="w-28 pb-0.5">FINALIZACIÓN:</span> <input type="date" className="acta-input flex-1" value={acta.fFinalizacion} onChange={e=>handleChange('fFinalizacion', e.target.value)} readOnly={readOnly}/></div>
-                </div>
-
-                {/* TAREAS CHECKBOXES */}
-                <div className="mb-3 flex items-center gap-5 text-[12px]">
-                    <span className="underline mr-2 font-bold">Tareas:</span>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('montaje')}>{acta.tareas.montaje ? 'X' : ''}</div> Montaje</label>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('reclamo')}>{acta.tareas.reclamo ? 'X' : ''}</div> Reclamo</label>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('supervision')}>{acta.tareas.supervision ? 'X' : ''}</div> Supervisión</label>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('servicios')}>{acta.tareas.servicios ? 'X' : ''}</div> Servicios</label>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('ensayos')}>{acta.tareas.ensayos ? 'X' : ''}</div> Ensayos</label>
-                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('otro')}>{acta.tareas.otro ? 'X' : ''}</div> Otro</label>
-                </div>
-                
-                <div className="border-b border-dotted border-black mb-4 w-full"></div>
-
-                {/* TEXTO CONTINUO Y ÁREA DE TRABAJOS (Textarea Normal vs Div de Impresión) */}
-                <div className="mb-4 text-[14px] leading-8 text-left font-medium flex-1 flex flex-col">
+            {/* ========================================================================= */}
+            {/* 1. MODO EDICIÓN MÓVIL (Formulario apilado clásico, cómodo para celulares) */}
+            {/* ========================================================================= */}
+            <div className={`${viewMode === 'form' && !isGenerating ? 'block' : 'hidden'} no-print bg-white p-5 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto`}>
+                <div className="space-y-8">
                     <div>
-                        En <input type="text" className="acta-inline-input w-lugar" placeholder="lugar" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/> 
-                        a los <input type="text" className="acta-inline-input w-dia" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/> días 
-                        del mes de <input type="text" className="acta-inline-input w-mes" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/> 
-                        del año <input type="text" className="acta-inline-input w-anio" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/>, 
-                        se reúne el Sr. <input type="text" className="acta-inline-input w-rep" placeholder="representante" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/> 
-                        en representación de <input type="text" className="acta-inline-input w-rep" placeholder="cliente" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/> 
-                        y el señor <input type="text" className="acta-inline-input w-rep" placeholder="técnico TTE" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/> 
-                        en representación de TTE Transformadores para común acuerdo labrar la presente acta de los trabajos realizados:
+                        <h4 className="font-black text-slate-800 border-b-2 border-slate-100 pb-2 mb-4 text-lg">1. Datos Generales</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Nº Acta</label><input type="text" className="input-field font-bold text-rose-600" value={acta.nroActa} onChange={e=>handleChange('nroActa', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Cliente</label><input type="text" className="input-field" value={acta.cliente} onChange={e=>handleChange('cliente', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Transformador</label><input type="text" className="input-field" value={acta.trafo} onChange={e=>handleChange('trafo', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Lugar / Ubicación</label><input type="text" className="input-field" value={acta.lugar} onChange={e=>handleChange('lugar', e.target.value)} readOnly={readOnly}/></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-slate-500 mb-1 block">Potencia</label><input type="text" className="input-field" value={acta.potencia} onChange={e=>handleChange('potencia', e.target.value)} readOnly={readOnly}/></div>
+                                <div><label className="text-xs font-bold text-slate-500 mb-1 block">Relación</label><input type="text" className="input-field" value={acta.relacion} onChange={e=>handleChange('relacion', e.target.value)} readOnly={readOnly}/></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-slate-500 mb-1 block">Comienzo</label><input type="date" className="input-field text-sm" value={acta.fComienzo} onChange={e=>handleChange('fComienzo', e.target.value)} readOnly={readOnly}/></div>
+                                <div><label className="text-xs font-bold text-slate-500 mb-1 block">Finalización</label><input type="date" className="input-field text-sm" value={acta.fFinalizacion} onChange={e=>handleChange('fFinalizacion', e.target.value)} readOnly={readOnly}/></div>
+                            </div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Obra / Proyecto</label><input type="text" className="input-field" value={acta.obra} onChange={e=>handleChange('obra', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">OCI / Contrato</label><input type="text" className="input-field" value={acta.oci} onChange={e=>handleChange('oci', e.target.value)} readOnly={readOnly}/></div>
+                        </div>
                     </div>
 
-                    {/* El Textarea original (Se oculta al imprimir el PDF) */}
-                    <textarea 
-                        className="w-full mt-3 bg-transparent outline-none resize-none leading-relaxed custom-scrollbar text-[14px] flex-1 min-h-[200px]" 
-                        placeholder="Haga clic aquí para escribir (presione Enter para viñetas)..." 
-                        value={acta.trabajosRealizados} 
-                        onChange={e=>handleChange('trabajosRealizados', e.target.value)} 
-                        onFocus={(e) => {
-                            if (!acta.trabajosRealizados && !readOnly) {
-                                handleChange('trabajosRealizados', '• ');
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (readOnly) return;
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const { selectionStart, selectionEnd, value } = e.target;
-                                const newValue = value.substring(0, selectionStart) + '\n• ' + value.substring(selectionEnd);
-                                handleChange('trabajosRealizados', newValue);
-                                setTimeout(() => {
-                                    e.target.selectionStart = e.target.selectionEnd = selectionStart + 3;
-                                }, 0);
-                            }
-                        }}
-                        readOnly={readOnly}
-                    ></textarea>
+                    <div>
+                        <h4 className="font-black text-slate-800 border-b-2 border-slate-100 pb-2 mb-4 text-lg">2. Tareas Checkbox</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.montaje} onChange={()=>handleTareaChange('montaje')} disabled={readOnly}/> Montaje</label>
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.reclamo} onChange={()=>handleTareaChange('reclamo')} disabled={readOnly}/> Reclamo</label>
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.supervision} onChange={()=>handleTareaChange('supervision')} disabled={readOnly}/> Supervisión</label>
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.servicios} onChange={()=>handleTareaChange('servicios')} disabled={readOnly}/> Servicios</label>
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.ensayos} onChange={()=>handleTareaChange('ensayos')} disabled={readOnly}/> Ensayos</label>
+                            <label className="flex items-center gap-3 font-bold text-slate-700 cursor-pointer"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={acta.tareas.otro} onChange={()=>handleTareaChange('otro')} disabled={readOnly}/> Otro</label>
+                        </div>
+                    </div>
 
-                    {/* El Div de reemplazo (Solo se muestra al imprimir el PDF). Fuerza los saltos de línea con <br/> */}
-                    <div className="print-div mt-3 leading-relaxed text-[14px] flex-1 min-h-[200px] w-full text-left">
-                        {acta.trabajosRealizados.split('\n').map((line, index) => (
-                            <React.Fragment key={index}>
-                                {line}
-                                <br />
-                            </React.Fragment>
-                        ))}
+                    <div>
+                        <h4 className="font-black text-slate-800 border-b-2 border-slate-100 pb-2 mb-4 text-lg">3. Texto y Detalles</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+                            <div className="sm:col-span-2"><label className="text-xs font-bold text-slate-500 mb-1 block">Lugar de Firma</label><input type="text" className="input-field" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/></div>
+                            <div className="flex gap-2">
+                                <div className="flex-1"><label className="text-xs font-bold text-slate-500 mb-1 block">Día</label><input type="text" className="input-field text-center px-1" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/></div>
+                                <div className="flex-[2]"><label className="text-xs font-bold text-slate-500 mb-1 block">Mes</label><input type="text" className="input-field text-center px-1" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/></div>
+                            </div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Año</label><input type="text" className="input-field text-center px-1" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/></div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Representante Cliente</label><input type="text" className="input-field" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Empresa Cliente</label><input type="text" className="input-field" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Representante TTE</label><input type="text" className="input-field" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/></div>
+                        </div>
+                        
+                        <label className="text-xs font-bold text-slate-500 mb-2 block">Descripción de los Trabajos (Presiona Enter para viñetas)</label>
+                        <textarea 
+                            className="input-field min-h-[160px] resize-y custom-scrollbar" 
+                            placeholder="Detalle los trabajos..." 
+                            value={acta.trabajosRealizados} 
+                            onChange={e=>handleChange('trabajosRealizados', e.target.value)} 
+                            onFocus={handleTextareaFocus}
+                            onKeyDown={handleTextareaKeyDown}
+                            readOnly={readOnly}
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <h4 className="font-black text-slate-800 border-b-2 border-slate-100 pb-2 mb-4 text-lg">4. Firmas</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center">
+                                <label className="text-sm font-bold text-slate-800 mb-2 uppercase">Firma T.T.E.</label>
+                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaTte', sig)} readOnly={readOnly} initialData={acta.firmaTte} />
+                                <div className="w-full mt-4">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Aclaración</label>
+                                    <input type="text" className="input-field font-bold text-center mt-1" placeholder="Nombre..." value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center">
+                                <label className="text-sm font-bold text-slate-800 mb-2 uppercase">Firma Cliente</label>
+                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaCliente', sig)} readOnly={readOnly} initialData={acta.firmaCliente} />
+                                <div className="w-full mt-4">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Aclaración</label>
+                                    <input type="text" className="input-field font-bold text-center mt-1" placeholder="Nombre..." value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                {/* SECCIÓN FINAL (Firmas y Tabla de Revisión más pequeña) */}
-                <div className="mt-auto">
-                    <div className="mb-4 text-[13px] font-medium">
-                        Conforme las partes se firman original y copia de un mismo tenor y a un solo efecto en el lugar y fecha arriba indicado.
-                    </div>
+            {/* ========================================================================= */}
+            {/* 2. MODO VISTA PDF (TU CÓDIGO ORIGINAL INTACTO) */}
+            {/* ========================================================================= */}
+            <div className={`${viewMode === 'pdf' || isGenerating ? 'block' : 'hidden'} w-full overflow-x-auto pb-4 custom-scrollbar`}>
+                <div id="acta-printable" className="mx-auto p-6 shadow-xl font-sans w-full max-w-[800px] h-auto min-h-[1050px] relative border border-slate-300 flex flex-col" style={{ backgroundColor: '#ffffff' }}>
+                    
+                    <style>{`
+                        #acta-printable * {
+                            color: #000000 !important;
+                            border-color: #000000 !important;
+                        }
+                        
+                        #acta-printable input[type="text"].acta-input,
+                        #acta-printable input[type="date"].acta-input {
+                            background: transparent !important;
+                            background-color: transparent !important;
+                            border-top: none !important;
+                            border-left: none !important;
+                            border-right: none !important;
+                            border-bottom: 1px dotted #000000 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            padding: 0 4px !important;
+                            margin: 0 !important;
+                            height: 20px !important;
+                            min-height: 0 !important;
+                            font-family: inherit !important;
+                            font-size: 13px !important;
+                            font-weight: normal !important;
+                        }
 
-                    {/* Firmas */}
-                    <div className="grid grid-cols-2 gap-16 mb-4 text-[14px] font-bold">
-                        <div>
-                            <span>Por T.T.E:</span>
-                            <div className="mt-1 w-full flex justify-center">
-                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaTte', sig)} readOnly={readOnly} initialData={acta.firmaTte} />
-                            </div>
-                            <div className="mt-2 flex items-end">
-                                <span className="mr-2 pb-0.5">Aclaración:</span>
-                                <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
-                            </div>
-                        </div>
-                        <div>
-                            <span>Por Cliente:</span>
-                            <div className="mt-1 w-full flex justify-center">
-                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaCliente', sig)} readOnly={readOnly} initialData={acta.firmaCliente} />
-                            </div>
-                            <div className="mt-2 flex items-end">
-                                <span className="mr-2 pb-0.5">Aclaración:</span>
-                                <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
-                            </div>
-                        </div>
-                    </div>
+                        #acta-printable input.acta-inline-input {
+                            display: inline-block !important;
+                            background: transparent !important;
+                            background-color: transparent !important;
+                            border-top: none !important;
+                            border-left: none !important;
+                            border-right: none !important;
+                            border-bottom: 1px solid #000000 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            margin: 0 4px !important;
+                            padding: 0 2px !important;
+                            font-family: inherit !important;
+                            font-size: 14px !important;
+                            font-weight: bold !important;
+                            vertical-align: baseline !important;
+                            line-height: normal !important;
+                            height: auto !important;
+                            text-align: center !important;
+                            appearance: none !important; 
+                            -webkit-appearance: none !important;
+                        }
 
-                    {/* Tabla de Revisión Inferior */}
-                    <table className="w-full border-collapse border border-black text-[10px] text-center font-bold">
+                        #acta-printable input.w-lugar { width: 140px !important; }
+                        #acta-printable input.w-dia { width: 40px !important; }
+                        #acta-printable input.w-mes { width: 100px !important; }
+                        #acta-printable input.w-anio { width: 60px !important; }
+                        #acta-printable input.w-rep { width: 220px !important; }
+                        #acta-printable input.w-nro { width: 70px !important; font-weight: bold !important; }
+
+                        #acta-printable textarea,
+                        #acta-printable .print-div {
+                            background-color: transparent !important;
+                            border: 1px solid #000000 !important;
+                            border-radius: 0 !important;
+                            box-shadow: none !important;
+                            padding: 8px !important;
+                            font-size: 14px !important;
+                            white-space: pre-wrap !important;
+                            word-wrap: break-word !important;
+                        }
+                        
+                        #acta-printable .print-div {
+                            display: none !important;
+                        }
+
+                        body.generating-pdf .no-print { display: none !important; }
+                        
+                        body.generating-pdf #acta-printable input[type="text"].acta-input,
+                        body.generating-pdf #acta-printable input[type="date"].acta-input {
+                            border-bottom-color: transparent !important;
+                        }
+                        
+                        body.generating-pdf #acta-printable textarea {
+                            display: none !important;
+                        }
+                        body.generating-pdf #acta-printable .print-div {
+                            display: block !important;
+                        }
+
+                        .pdf-checkbox { width: 14px !important; height: 14px !important; border: 1px solid #000 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-weight: bold !important; cursor: pointer !important; font-size: 12px !important; margin-right: 4px !important;}
+                    `}</style>
+                    
+                    <table className="w-full border-collapse border border-black mb-4">
                         <tbody>
                             <tr>
-                                <td colSpan="3" className="border border-black p-0.5">REVISIÓN: 01</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-0.5 w-1/3">REALIZÓ</td>
-                                <td className="border border-black p-0.5 w-1/3">APROBÓ</td>
-                                <td className="border border-black p-0.5 w-1/3">FECHA</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-0.5 font-normal">PPV</td>
-                                <td className="border border-black p-0.5 font-normal">JPV</td>
-                                <td className="border border-black p-0.5 font-normal">Diciembre 2024</td>
+                                <td className="w-1/4 border border-black p-1 text-center align-middle h-16">
+                                    <img src={COMPANY_LOGO} alt="TTE Logo" className="max-h-12 mx-auto object-contain" crossOrigin="anonymous" />
+                                </td>
+                                <td className="w-1/2 border border-black p-1 text-center align-middle">
+                                    <div className="font-bold text-lg tracking-wide">SERVICIO POSVENTA</div>
+                                    <div className="font-bold text-lg tracking-wide mt-1">ACTA DE SERVICIO</div>
+                                </td>
+                                <td className="w-1/4 border border-black p-2 align-middle text-left relative">
+                                    <div className="mb-2 text-md font-bold">R-GI-SPV-1</div>
+                                    <div className="flex items-center text-xs font-bold">
+                                        Nº <input type="text" className="acta-inline-input w-nro" placeholder="........" value={acta.nroActa} onChange={e=>handleChange('nroActa', e.target.value)} readOnly={readOnly}/>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
+
+                    <div className="grid grid-cols-2 gap-y-0.5 gap-x-8 mb-4 uppercase text-[12px] font-bold">
+                        <div className="flex items-end"><span className="w-28 pb-0.5">CLIENTE:</span> <input type="text" className="acta-input flex-1" value={acta.cliente} onChange={e=>handleChange('cliente', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">TRAFO:</span> <input type="text" className="acta-input flex-1" value={acta.trafo} onChange={e=>handleChange('trafo', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">LUGAR:</span> <input type="text" className="acta-input flex-1" value={acta.lugar} onChange={e=>handleChange('lugar', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">POTENCIA:</span> <input type="text" className="acta-input flex-1" value={acta.potencia} onChange={e=>handleChange('potencia', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">OBRA:</span> <input type="text" className="acta-input flex-1" value={acta.obra} onChange={e=>handleChange('obra', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">RELACIÓN:</span> <input type="text" className="acta-input flex-1" value={acta.relacion} onChange={e=>handleChange('relacion', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5 whitespace-nowrap">OCI / CONTRATO:</span> <input type="text" className="acta-input flex-1" value={acta.oci} onChange={e=>handleChange('oci', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">MARCA:</span> <span className="flex-1 border-b border-dotted border-black font-normal px-1 h-[20px] flex items-end pb-0.5">TTE</span></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">COMIENZO:</span> <input type="date" className="acta-input flex-1" value={acta.fComienzo} onChange={e=>handleChange('fComienzo', e.target.value)} readOnly={readOnly}/></div>
+                        <div className="flex items-end"><span className="w-28 pb-0.5">FINALIZACIÓN:</span> <input type="date" className="acta-input flex-1" value={acta.fFinalizacion} onChange={e=>handleChange('fFinalizacion', e.target.value)} readOnly={readOnly}/></div>
+                    </div>
+
+                    <div className="mb-3 flex items-center gap-5 text-[12px]">
+                        <span className="underline mr-2 font-bold">Tareas:</span>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('montaje')}>{acta.tareas.montaje ? 'X' : ''}</div> Montaje</label>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('reclamo')}>{acta.tareas.reclamo ? 'X' : ''}</div> Reclamo</label>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('supervision')}>{acta.tareas.supervision ? 'X' : ''}</div> Supervisión</label>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('servicios')}>{acta.tareas.servicios ? 'X' : ''}</div> Servicios</label>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('ensayos')}>{acta.tareas.ensayos ? 'X' : ''}</div> Ensayos</label>
+                        <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('otro')}>{acta.tareas.otro ? 'X' : ''}</div> Otro</label>
+                    </div>
+                    
+                    <div className="border-b border-dotted border-black mb-4 w-full"></div>
+
+                    <div className="mb-4 text-[14px] leading-8 text-left font-medium flex-1 flex flex-col">
+                        <div>
+                            En <input type="text" className="acta-inline-input w-lugar" placeholder="lugar" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/> 
+                            a los <input type="text" className="acta-inline-input w-dia" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/> días 
+                            del mes de <input type="text" className="acta-inline-input w-mes" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/> 
+                            del año <input type="text" className="acta-inline-input w-anio" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/>, 
+                            se reúne el Sr. <input type="text" className="acta-inline-input w-rep" placeholder="representante" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/> 
+                            en representación de <input type="text" className="acta-inline-input w-rep" placeholder="cliente" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/> 
+                            y el señor <input type="text" className="acta-inline-input w-rep" placeholder="técnico TTE" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/> 
+                            en representación de TTE Transformadores para común acuerdo labrar la presente acta de los trabajos realizados:
+                        </div>
+
+                        <textarea 
+                            className="w-full mt-3 bg-transparent outline-none resize-none leading-relaxed custom-scrollbar text-[14px] flex-1 min-h-[200px]" 
+                            placeholder="Haga clic aquí para escribir (presione Enter para viñetas)..." 
+                            value={acta.trabajosRealizados} 
+                            onChange={e=>handleChange('trabajosRealizados', e.target.value)} 
+                            onFocus={handleTextareaFocus}
+                            onKeyDown={handleTextareaKeyDown}
+                            readOnly={readOnly}
+                        ></textarea>
+
+                        <div className="print-div mt-3 leading-relaxed text-[14px] flex-1 min-h-[200px] w-full text-left">
+                            {acta.trabajosRealizados.split('\n').map((line, index) => (
+                                <React.Fragment key={index}>
+                                    {line}
+                                    <br />
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-auto">
+                        <div className="mb-4 text-[13px] font-medium">
+                            Conforme las partes se firman original y copia de un mismo tenor y a un solo efecto en el lugar y fecha arriba indicado.
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-16 mb-4 text-[14px] font-bold">
+                            <div>
+                                <span>Por T.T.E:</span>
+                                <div className="mt-1 w-full flex justify-center">
+                                    <SignaturePad onSaveSignature={(sig) => handleChange('firmaTte', sig)} readOnly={readOnly} initialData={acta.firmaTte} />
+                                </div>
+                                <div className="mt-2 flex items-end">
+                                    <span className="mr-2 pb-0.5">Aclaración:</span>
+                                    <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                </div>
+                            </div>
+                            <div>
+                                <span>Por Cliente:</span>
+                                <div className="mt-1 w-full flex justify-center">
+                                    <SignaturePad onSaveSignature={(sig) => handleChange('firmaCliente', sig)} readOnly={readOnly} initialData={acta.firmaCliente} />
+                                </div>
+                                <div className="mt-2 flex items-end">
+                                    <span className="mr-2 pb-0.5">Aclaración:</span>
+                                    <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table className="w-full border-collapse border border-black text-[10px] text-center font-bold">
+                            <tbody>
+                                <tr>
+                                    <td colSpan="3" className="border border-black p-0.5">REVISIÓN: 01</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-black p-0.5 w-1/3">REALIZÓ</td>
+                                    <td className="border border-black p-0.5 w-1/3">APROBÓ</td>
+                                    <td className="border border-black p-0.5 w-1/3">FECHA</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-black p-0.5 font-normal">PPV</td>
+                                    <td className="border border-black p-0.5 font-normal">JPV</td>
+                                    <td className="border border-black p-0.5 font-normal">Diciembre 2024</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

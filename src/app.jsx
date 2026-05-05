@@ -2746,87 +2746,87 @@
                 </div>
             );
         };
-        
-const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
-    const canvasRef = useRef(null);
-    const [isDrawing, setIsDrawing] = useState(false);
 
-    useEffect(() => {
-        if (initialData && canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0);
-            img.src = initialData;
-        }
-    }, [initialData]);
+        const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
+            const canvasRef = useRef(null);
+            const [isDrawing, setIsDrawing] = useState(false);
 
-    const startDrawing = (e) => {
-        if (readOnly) return;
-        const { offsetX, offsetY } = getCoordinates(e);
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.beginPath();
-        ctx.moveTo(offsetX, offsetY);
-        setIsDrawing(true);
-    };
+            useEffect(() => {
+                if (initialData && canvasRef.current) {
+                    const ctx = canvasRef.current.getContext('2d');
+                    const img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.src = initialData;
+                }
+            }, [initialData]);
 
-    const draw = (e) => {
-        if (!isDrawing || readOnly) return;
-        const { offsetX, offsetY } = getCoordinates(e);
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.lineTo(offsetX, offsetY);
-        ctx.stroke();
-    };
-
-    const stopDrawing = () => {
-        if (isDrawing && !readOnly) {
-            setIsDrawing(false);
-            if (onSaveSignature) onSaveSignature(canvasRef.current.toDataURL());
-        }
-    };
-
-    const getCoordinates = (event) => {
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        if (event.touches && event.touches.length > 0) {
-            return {
-                offsetX: event.touches[0].clientX - rect.left,
-                offsetY: event.touches[0].clientY - rect.top
+            const startDrawing = (e) => {
+                if (readOnly) return;
+                const { offsetX, offsetY } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.beginPath();
+                ctx.moveTo(offsetX, offsetY);
+                setIsDrawing(true);
             };
-        }
-        return {
-            offsetX: event.nativeEvent.offsetX,
-            offsetY: event.nativeEvent.offsetY
+
+            const draw = (e) => {
+                if (!isDrawing || readOnly) return;
+                const { offsetX, offsetY } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.lineTo(offsetX, offsetY);
+                ctx.stroke();
+            };
+
+            const stopDrawing = () => {
+                if (isDrawing && !readOnly) {
+                    setIsDrawing(false);
+                    if (onSaveSignature) onSaveSignature(canvasRef.current.toDataURL());
+                }
+            };
+
+            const getCoordinates = (event) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                if (event.touches && event.touches.length > 0) {
+                    return {
+                        offsetX: event.touches[0].clientX - rect.left,
+                        offsetY: event.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    offsetX: event.nativeEvent.offsetX,
+                    offsetY: event.nativeEvent.offsetY
+                };
+            };
+
+            const clear = () => {
+                if (readOnly) return;
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (onSaveSignature) onSaveSignature(null);
+            };
+
+            return (
+                <div className="flex flex-col items-center w-full">
+                    <canvas
+                       ref={canvasRef}
+                        width={320}  /* ANTES: 300 - Aumentado al máximo permitido por la grilla */
+                        height={140} /* ANTES: 80 - Casi el doble de alto para más comodidad */
+                        style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
+                        className={`border border-slate-300 border-b-black w-full max-w-[320px] rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
+                        onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
+                    />
+                    {!readOnly && (
+                        <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
+                            Limpiar firma
+                        </button>
+                    )}
+                </div>
+            );
         };
-    };
-
-    const clear = () => {
-        if (readOnly) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (onSaveSignature) onSaveSignature(null);
-    };
-
-    return (
-        <div className="flex flex-col items-center w-full">
-            <canvas
-                ref={canvasRef}
-                width={320}  /* ANTES: 300 - Aumentado al máximo permitido por la grilla */
-                height={140} /* ANTES: 80 - Casi el doble de alto para más comodidad */
-                style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
-                className={`border border-slate-300 border-b-black w-full max-w-[320px] rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
-                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
-            />
-            {!readOnly && (
-                <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
-                    Limpiar firma
-                </button>
-            )}
-        </div>
-    );
-};
-
+        
         // 2. Componente Editor y Generador de PDF del Acta
         const ActaEditor = ({ service, actaData, onSave, onBack, readOnly = false }) => {
             const defaultDate = new Date();

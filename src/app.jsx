@@ -32,7 +32,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 try { enableIndexedDbPersistence(db).catch((err) => {}); } catch (e) {}
 
 const BACKGROUND_IMAGE = "https://i.imgur.com/EfUXRhd.png"; 
-const COMPANY_LOGO = "https://imgur.com/tH8Cu4p.png"; 
+const COMPANY_LOGO = "https://i.imgur.com/tH8Cu4p.png"; 
 
 const TIPOS_TRABAJO = [
   "Montaje de Transformador", "Supervisión de Montaje", "Asistencia por reclamo", 
@@ -1500,6 +1500,22 @@ const TechReportViewer = ({ service }) => {
                  {closure.reason && <p className="text-xs text-rose-600 font-medium">Motivo: {closure.reasonType} - {closure.reason}</p>}
                  <div><span className="text-xs font-bold text-slate-500 block mb-1">Observación Final:</span><p className="text-xs text-slate-700 bg-white p-2 rounded border border-slate-100">{closure.observation}</p></div>
                  <div><span className="text-xs font-bold text-slate-500 block mb-1">Acta y Archivos Finales:</span><div className="flex gap-2 flex-wrap">{closure.files && closure.files.map((f, i) => (<a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-slate-100 text-slate-600 text-[10px] rounded border border-slate-200 hover:bg-slate-200"><FileCheck className="w-3 h-3 mr-1"/> {f.name}</a>))}</div></div>
+              {/* Modifica la sección de "Acta y Archivos Finales:" por esto: */}
+                <div>
+                    <span className="text-xs font-bold text-slate-500 block mb-1">Actas Formales y Archivos:</span>
+                    <div className="flex gap-2 flex-wrap">
+                        {service.actas && service.actas.length > 0 && service.actas.map((a, i) => (
+                        <span key={i} className="flex items-center px-2 py-1 bg-rose-50 text-rose-700 font-bold text-[10px] rounded border border-rose-200">
+                                <FileCheck className="w-3 h-3 mr-1"/> Acta #{a.nroActa || 'S/N'} Registrada
+                                </span>
+                        ))}
+                        {closure.files && closure.files.map((f, i) => (
+                            <a key={i} href={f.url} target="_blank" className="flex items-center px-2 py-1 bg-slate-100 text-slate-600 text-[10px] rounded border border-slate-200 hover:bg-slate-200">
+                                <Paperclip className="w-3 h-3 mr-1"/> {f.name}
+                            </a>
+                        ))}
+                    </div>
+                </div>
               </div>
             )}
           </div>
@@ -2247,6 +2263,7 @@ const TransformerHistory = ({ services }) => {
 };
 
 const TechPortal = ({ services, maintenanceRecords, user, handleStartService, onMaintenanceStatusChange, setUploadingEvidenceService, setEvidenceData, setLoggingHoursService, setDailyLogData, setTechsForHours, setClosingService, setClosureData, setReopeningService, setReopenReason, showNotification }) => {
+    const [managingActaService, setManagingActaService] = useState(null);
     const [view, setView] = useState('list'); 
     const [hideCompleted, setHideCompleted] = useState(false);
     const [previewService, setPreviewService] = useState(null);
@@ -2289,6 +2306,18 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
         const link = `${window.location.origin}${window.location.pathname}?survey=true&serviceId=${serviceId}`;
         navigator.clipboard.writeText(link);
         showNotification("Link de encuesta copiado al portapapeles", "success");
+    };
+    const handleUpdateServiceActa = async (actaData) => {
+        const existingActas = managingActaService.actas || [];
+        // Si el acta ya existe, la actualiza. Si no, la agrega.
+        const index = existingActas.findIndex(a => a.id === actaData.id);
+        let newActas = [...existingActas];
+        if (index >= 0) newActas[index] = actaData;
+        else newActas.push(actaData);
+
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'services', managingActaService.id), { actas: newActas });
+        setManagingActaService(prev => ({...prev, actas: newActas}));
+        showNotification("Acta guardada correctamente");
     };
 
     const handleUpdateServiceTests = async (testUpdates) => {
@@ -2399,6 +2428,10 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
                                                         {requiresTests && (
                                                             <button onClick={() => setManagingTestsService(srv)} className="bg-white text-teal-600 border border-teal-200 py-2 px-3 rounded-lg font-bold hover:bg-teal-50 flex items-center justify-center text-xs transition-colors"><FileSpreadsheet className="w-4 h-4 mr-2"/> Cargar Ensayos</button>
                                                         )}
+                                                        {/* Agrega este botón justo debajo del botón de Cargar Horas o Cargar Ensayos */}
+                                                        <button onClick={() => setManagingActaService(srv)} className="bg-white text-rose-600 border border-rose-200 py-2 px-3 rounded-lg font-bold hover:bg-rose-50 flex items-center justify-center text-xs transition-colors shadow-sm">
+                                                            <FileCheck className="w-4 h-4 mr-2"/> Generar Acta
+                                                        </button>
                                                         <button onClick={() => { setLoggingHoursService(srv); setDailyLogData({date: new Date().toISOString().split('T')[0], start:'', end:'', type: 'Trabajo'}); setTechsForHours(srv.tecnicos); }} className="bg-white text-indigo-600 border border-indigo-200 py-2 px-3 rounded-lg font-bold hover:bg-indigo-50 flex items-center justify-center text-xs transition-colors"><Timer className="w-4 h-4 mr-2"/> Cargar Horas</button>
                                                     </>
                                                 )}
@@ -2528,6 +2561,17 @@ const TechPortal = ({ services, maintenanceRecords, user, handleStartService, on
             <Modal isOpen={!!managingTestsService} onClose={() => setManagingTestsService(null)} title="Gestión de Ensayos" size="xl">
                 {managingTestsService && <ServiceTestsManager service={managingTestsService} onUpdateService={handleUpdateServiceTests} onClose={() => setManagingTestsService(null)} />}
             </Modal>
+            {/* Debajo del Modal Especial para Ensayos */}
+            <Modal isOpen={!!managingActaService} onClose={() => setManagingActaService(null)} title="Generar Acta de Servicio" size="xl">
+                {managingActaService && (
+                    <ActaEditor 
+                        service={managingActaService} 
+                        actaData={managingActaService.actas?.[0] || null} // Carga la primera si existe
+                        onSave={handleUpdateServiceActa} 
+                        onBack={() => setManagingActaService(null)} 
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
@@ -2595,6 +2639,480 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
                         <button onClick={handleLogin} className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-all">Ingresar</button>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+
+// ============================================================================
+// MODULO DE ACTAS DE SERVICIO
+// ============================================================================
+
+// 1. Componente de Firma Digital (Canvas)
+const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+
+    useEffect(() => {
+        if (initialData && canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0);
+            img.src = initialData;
+        }
+    }, [initialData]);
+
+    const startDrawing = (e) => {
+        if (readOnly) return;
+        const { offsetX, offsetY } = getCoordinates(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(offsetX, offsetY);
+        setIsDrawing(true);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing || readOnly) return;
+        const { offsetX, offsetY } = getCoordinates(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.lineTo(offsetX, offsetY);
+        ctx.stroke();
+    };
+
+    const stopDrawing = () => {
+        if (isDrawing && !readOnly) {
+            setIsDrawing(false);
+            if (onSaveSignature) onSaveSignature(canvasRef.current.toDataURL());
+        }
+    };
+
+    const getCoordinates = (event) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        if (event.touches && event.touches.length > 0) {
+            return {
+                offsetX: event.touches[0].clientX - rect.left,
+                offsetY: event.touches[0].clientY - rect.top
+            };
+        }
+        return {
+            offsetX: event.nativeEvent.offsetX,
+            offsetY: event.nativeEvent.offsetY
+        };
+    };
+
+    const clear = () => {
+        if (readOnly) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (onSaveSignature) onSaveSignature(null);
+    };
+
+    return (
+        <div className="flex flex-col items-center w-full">
+            <canvas
+                ref={canvasRef}
+                width={300}
+                height={80}
+                style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
+                className={`border-b border-black w-full max-w-[300px] ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
+                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
+            />
+            {!readOnly && (
+                <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-1 font-bold no-print underline">
+                    Limpiar firma
+                </button>
+            )}
+        </div>
+    );
+};
+
+
+// 2. Componente Editor y Generador de PDF del Acta
+const ActaEditor = ({ service, actaData, onSave, onBack, readOnly = false }) => {
+    const defaultDate = new Date();
+    const [acta, setActa] = useState(actaData || {
+        id: generateId(),
+        nroActa: '',
+        cliente: service.cliente || '', trafo: service.trafoSerie || '', lugar: service.ubicacion || '', 
+        potencia: service.trafoPotencia || '', obra: '', relacion: service.trafoRelacion || '', 
+        oci: service.oci || '', marca: 'TTE', fComienzo: service.fInicio || '', fFinalizacion: service.fFin || '',
+        tareas: { montaje: false, reclamo: false, supervision: false, servicios: false, ensayos: false, otro: false },
+        lugarFirma: service.ubicacion || '', dia: defaultDate.getDate(), mes: defaultDate.toLocaleString('es-ES', { month: 'long' }), anio: defaultDate.getFullYear(),
+        srCliente: service.contactoResponsable || '', repCliente: service.cliente || '',
+        srTte: (service.tecnicos && service.tecnicos[0]) || '',
+        trabajosRealizados: '',
+        firmaTte: null, aclaracionTte: (service.tecnicos && service.tecnicos[0]) || '',
+        firmaCliente: null, aclaracionCliente: service.contactoResponsable || '',
+        createdAt: new Date().toISOString()
+    });
+
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        const loadScript = (src) => {
+            if (document.querySelector(`script[src="${src}"]`)) return;
+            const script = document.createElement('script');
+            script.src = src; script.async = true;
+            document.body.appendChild(script);
+        };
+        loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
+    }, []);
+
+    const handleChange = (field, value) => {
+        if (readOnly) return;
+        setActa(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleTareaChange = (tarea) => {
+        if (readOnly) return;
+        setActa(prev => ({ ...prev, tareas: { ...prev.tareas, [tarea]: !prev.tareas[tarea] } }));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        await onSave(acta);
+        setIsSaving(false);
+    };
+
+    const handleDownloadPDF = () => {
+        const element = document.getElementById('acta-printable');
+        if (!window.html2pdf) return alert("Cargando librería PDF...");
+        document.body.classList.add('generating-pdf');
+        
+        const opt = { 
+            margin: [10, 10, 10, 10], 
+            filename: `Acta_Servicio_${acta.oci}_${acta.nroActa || 'SN'}.pdf`, 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+        };
+        
+        window.html2pdf().set(opt).from(element).save().then(() => document.body.classList.remove('generating-pdf'));
+    };
+
+    return (
+        <div className="w-full bg-slate-200 p-4 rounded-xl">
+            <div className="flex justify-between items-center mb-4 no-print">
+                <button onClick={onBack} className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-white rounded font-bold text-sm hover:bg-slate-800"><ArrowLeft size={16} /> Volver</button>
+                <div className="flex gap-2">
+                    {!readOnly && <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded font-bold text-sm hover:bg-emerald-700 shadow">{isSaving ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>} Guardar Acta</button>}
+                    <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded font-bold text-sm hover:bg-rose-700 shadow"><Download size={16}/> Descargar PDF</button>
+                </div>
+            </div>
+
+            {/* DOCUMENTO IMPRIMIBLE */}
+            <div id="acta-printable" className="mx-auto p-6 shadow-xl font-sans w-full max-w-[800px] h-auto min-h-[1050px] relative border border-slate-300 flex flex-col" style={{ backgroundColor: '#ffffff' }}>
+                
+                <style>{`
+                    #acta-printable * {
+                        color: #000000 !important;
+                        border-color: #000000 !important;
+                    }
+                    
+                    #acta-printable input[type="text"].acta-input,
+                    #acta-printable input[type="date"].acta-input {
+                        background: transparent !important;
+                        background-color: transparent !important;
+                        border-top: none !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-bottom: 1px dotted #000000 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                        padding: 0 4px !important;
+                        margin: 0 !important;
+                        height: 20px !important;
+                        min-height: 0 !important;
+                        font-family: inherit !important;
+                        font-size: 13px !important;
+                        font-weight: normal !important;
+                    }
+
+                    #acta-printable input.acta-inline-input {
+                        display: inline-block !important;
+                        background: transparent !important;
+                        background-color: transparent !important;
+                        border-top: none !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-bottom: 1px solid #000000 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                        margin: 0 4px !important;
+                        padding: 0 2px !important;
+                        font-family: inherit !important;
+                        font-size: 14px !important;
+                        font-weight: bold !important;
+                        vertical-align: baseline !important;
+                        line-height: normal !important;
+                        height: auto !important;
+                        text-align: center !important;
+                        appearance: none !important; 
+                        -webkit-appearance: none !important;
+                    }
+
+                    #acta-printable input.w-lugar { width: 140px !important; }
+                    #acta-printable input.w-dia { width: 40px !important; }
+                    #acta-printable input.w-mes { width: 100px !important; }
+                    #acta-printable input.w-anio { width: 60px !important; }
+                    #acta-printable input.w-rep { width: 220px !important; }
+                    #acta-printable input.w-nro { width: 70px !important; font-weight: bold !important; }
+
+                    /* ESTILOS DEL TEXTAREA Y EL DIV DE IMPRESIÓN */
+                    #acta-printable textarea,
+                    #acta-printable .print-div {
+                        background-color: transparent !important;
+                        border: 1px solid #000000 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                        padding: 8px !important;
+                        font-size: 14px !important;
+                    }
+                    
+                    /* El Div de impresión solo se muestra cuando se exporta a PDF */
+                    #acta-printable .print-div {
+                        display: none !important;
+                    }
+
+                    body.generating-pdf .no-print { display: none !important; }
+                    
+                    /* Oculta los punteados de la cabecera al imprimir */
+                    body.generating-pdf #acta-printable input[type="text"].acta-input,
+                    body.generating-pdf #acta-printable input[type="date"].acta-input {
+                        border-bottom-color: transparent !important;
+                    }
+                    
+                    /* Intercambio de Textarea a Div al generar PDF */
+                    body.generating-pdf #acta-printable textarea {
+                        display: none !important;
+                    }
+                    body.generating-pdf #acta-printable .print-div {
+                        display: block !important;
+                    }
+
+                    .pdf-checkbox { width: 14px !important; height: 14px !important; border: 1px solid #000 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; font-weight: bold !important; cursor: pointer !important; font-size: 12px !important; margin-right: 4px !important;}
+                `}</style>
+                
+                {/* ENCABEZADO CARÁTULA */}
+                <table className="w-full border-collapse border border-black mb-4">
+                    <tbody>
+                        <tr>
+                            <td className="w-1/4 border border-black p-1 text-center align-middle h-16">
+                                <img src={COMPANY_LOGO} alt="TTE Logo" className="max-h-12 mx-auto object-contain" crossOrigin="anonymous" />
+                            </td>
+                            <td className="w-1/2 border border-black p-1 text-center align-middle">
+                                <div className="font-bold text-lg tracking-wide">SERVICIO POSVENTA</div>
+                                <div className="font-bold text-lg tracking-wide mt-1">ACTA DE SERVICIO</div>
+                            </td>
+                            <td className="w-1/4 border border-black p-2 align-middle text-left relative">
+                                <div className="mb-2 text-md font-bold">R-GI-SPV-1</div>
+                                <div className="flex items-center text-xs font-bold">
+                                    Nº <input type="text" className="acta-inline-input w-nro" placeholder="........" value={acta.nroActa} onChange={e=>handleChange('nroActa', e.target.value)} readOnly={readOnly}/>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* BLOQUE DE DATOS */}
+                <div className="grid grid-cols-2 gap-y-0.5 gap-x-8 mb-4 uppercase text-[12px] font-bold">
+                    <div className="flex items-end"><span className="w-28 pb-0.5">CLIENTE:</span> <input type="text" className="acta-input flex-1" value={acta.cliente} onChange={e=>handleChange('cliente', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">TRAFO:</span> <input type="text" className="acta-input flex-1" value={acta.trafo} onChange={e=>handleChange('trafo', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">LUGAR:</span> <input type="text" className="acta-input flex-1" value={acta.lugar} onChange={e=>handleChange('lugar', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">POTENCIA:</span> <input type="text" className="acta-input flex-1" value={acta.potencia} onChange={e=>handleChange('potencia', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">OBRA:</span> <input type="text" className="acta-input flex-1" value={acta.obra} onChange={e=>handleChange('obra', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">RELACIÓN:</span> <input type="text" className="acta-input flex-1" value={acta.relacion} onChange={e=>handleChange('relacion', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5 whitespace-nowrap">OCI / CONTRATO:</span> <input type="text" className="acta-input flex-1" value={acta.oci} onChange={e=>handleChange('oci', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">MARCA:</span> <span className="flex-1 border-b border-dotted border-black font-normal px-1 h-[20px] flex items-end pb-0.5">TTE</span></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">COMIENZO:</span> <input type="date" className="acta-input flex-1" value={acta.fComienzo} onChange={e=>handleChange('fComienzo', e.target.value)} readOnly={readOnly}/></div>
+                    <div className="flex items-end"><span className="w-28 pb-0.5">FINALIZACIÓN:</span> <input type="date" className="acta-input flex-1" value={acta.fFinalizacion} onChange={e=>handleChange('fFinalizacion', e.target.value)} readOnly={readOnly}/></div>
+                </div>
+
+                {/* TAREAS CHECKBOXES */}
+                <div className="mb-3 flex items-center gap-5 text-[12px]">
+                    <span className="underline mr-2 font-bold">Tareas:</span>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('montaje')}>{acta.tareas.montaje ? 'X' : ''}</div> Montaje</label>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('reclamo')}>{acta.tareas.reclamo ? 'X' : ''}</div> Reclamo</label>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('supervision')}>{acta.tareas.supervision ? 'X' : ''}</div> Supervisión</label>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('servicios')}>{acta.tareas.servicios ? 'X' : ''}</div> Servicios</label>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('ensayos')}>{acta.tareas.ensayos ? 'X' : ''}</div> Ensayos</label>
+                    <label className="flex items-center cursor-pointer hover:bg-slate-50"><div className="pdf-checkbox" onClick={() => handleTareaChange('otro')}>{acta.tareas.otro ? 'X' : ''}</div> Otro</label>
+                </div>
+                
+                <div className="border-b border-dotted border-black mb-4 w-full"></div>
+
+                {/* TEXTO CONTINUO Y ÁREA DE TRABAJOS (Textarea Normal vs Div de Impresión) */}
+                <div className="mb-4 text-[14px] leading-8 text-left font-medium flex-1 flex flex-col">
+                    <div>
+                        En <input type="text" className="acta-inline-input w-lugar" placeholder="lugar" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/> 
+                        a los <input type="text" className="acta-inline-input w-dia" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/> días 
+                        del mes de <input type="text" className="acta-inline-input w-mes" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/> 
+                        del año <input type="text" className="acta-inline-input w-anio" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/>, 
+                        se reúne el Sr. <input type="text" className="acta-inline-input w-rep" placeholder="representante" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/> 
+                        en representación de <input type="text" className="acta-inline-input w-rep" placeholder="cliente" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/> 
+                        y el señor <input type="text" className="acta-inline-input w-rep" placeholder="técnico TTE" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/> 
+                        en representación de TTE Transformadores para común acuerdo labrar la presente acta de los trabajos realizados:
+                    </div>
+
+                    {/* El Textarea original (Se oculta al imprimir el PDF) */}
+                    <textarea 
+                        className="w-full mt-3 bg-transparent outline-none resize-none leading-relaxed custom-scrollbar text-[14px] flex-1 min-h-[200px]" 
+                        placeholder="Haga clic aquí para escribir (presione Enter para viñetas)..." 
+                        value={acta.trabajosRealizados} 
+                        onChange={e=>handleChange('trabajosRealizados', e.target.value)} 
+                        onFocus={(e) => {
+                            if (!acta.trabajosRealizados && !readOnly) {
+                                handleChange('trabajosRealizados', '• ');
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (readOnly) return;
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const { selectionStart, selectionEnd, value } = e.target;
+                                const newValue = value.substring(0, selectionStart) + '\n• ' + value.substring(selectionEnd);
+                                handleChange('trabajosRealizados', newValue);
+                                setTimeout(() => {
+                                    e.target.selectionStart = e.target.selectionEnd = selectionStart + 3;
+                                }, 0);
+                            }
+                        }}
+                        readOnly={readOnly}
+                    ></textarea>
+
+                    {/* El Div de reemplazo (Solo se muestra al imprimir el PDF). Fuerza los saltos de línea con <br/> */}
+                    <div className="print-div mt-3 leading-relaxed text-[14px] flex-1 min-h-[200px] w-full text-left">
+                        {acta.trabajosRealizados.split('\n').map((line, index) => (
+                            <React.Fragment key={index}>
+                                {line}
+                                <br />
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </div>
+
+                {/* SECCIÓN FINAL (Firmas y Tabla de Revisión más pequeña) */}
+                <div className="mt-auto">
+                    <div className="mb-4 text-[13px] font-medium">
+                        Conforme las partes se firman original y copia de un mismo tenor y a un solo efecto en el lugar y fecha arriba indicado.
+                    </div>
+
+                    {/* Firmas */}
+                    <div className="grid grid-cols-2 gap-16 mb-4 text-[14px] font-bold">
+                        <div>
+                            <span>Por T.T.E:</span>
+                            <div className="mt-1 w-full flex justify-center">
+                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaTte', sig)} readOnly={readOnly} initialData={acta.firmaTte} />
+                            </div>
+                            <div className="mt-2 flex items-end">
+                                <span className="mr-2 pb-0.5">Aclaración:</span>
+                                <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                            </div>
+                        </div>
+                        <div>
+                            <span>Por Cliente:</span>
+                            <div className="mt-1 w-full flex justify-center">
+                                <SignaturePad onSaveSignature={(sig) => handleChange('firmaCliente', sig)} readOnly={readOnly} initialData={acta.firmaCliente} />
+                            </div>
+                            <div className="mt-2 flex items-end">
+                                <span className="mr-2 pb-0.5">Aclaración:</span>
+                                <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tabla de Revisión Inferior */}
+                    <table className="w-full border-collapse border border-black text-[10px] text-center font-bold">
+                        <tbody>
+                            <tr>
+                                <td colSpan="3" className="border border-black p-0.5">REVISIÓN: 01</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-0.5 w-1/3">REALIZÓ</td>
+                                <td className="border border-black p-0.5 w-1/3">APROBÓ</td>
+                                <td className="border border-black p-0.5 w-1/3">FECHA</td>
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-0.5 font-normal">PPV</td>
+                                <td className="border border-black p-0.5 font-normal">JPV</td>
+                                <td className="border border-black p-0.5 font-normal">Diciembre 2024</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 3. Componente Dashboard Global de Actas (Para el Admin)
+const ActasDashboard = ({ services }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeActaContext, setActiveActaContext] = useState(null);
+
+    const allActas = useMemo(() => {
+        return services.flatMap(s => (s.actas || []).map(a => ({
+            ...a, serviceId: s.id, serviceOci: s.oci, serviceCliente: s.cliente
+        }))).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }, [services]);
+
+    const filteredActas = allActas.filter(a => 
+        (a.nroActa || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.serviceCliente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.serviceOci || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (activeActaContext) {
+        return <ActaEditor service={{}} actaData={activeActaContext} readOnly={true} onBack={() => setActiveActaContext(null)} onSave={()=>{}} />;
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in h-full flex flex-col">
+            <div className="bg-white/95 p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-sm shrink-0">
+                <div>
+                    <h3 className="text-lg font-bold flex items-center text-slate-800"><FileCheck className="w-5 h-5 mr-3 text-rose-600"/> Archivo de Actas de Servicio</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Registro formal de firmas de conformidad</p>
+                </div>
+                <div className="flex w-full md:w-auto flex-1 max-w-md relative">
+                    <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400"/>
+                    <input type="text" placeholder="Buscar por Cliente, OCI o N° Acta..." className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-rose-100 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex-1 overflow-hidden flex flex-col">
+                <div className="overflow-x-auto flex-1 custom-scrollbar">
+                    <table className="min-w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50 sticky top-0 z-10">
+                            <tr>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Acta N°</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Cliente / OCI</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Trafo</th>
+                                <th className="px-6 py-4 text-left font-bold text-slate-600 uppercase tracking-wider text-[10px]">Fecha Firma</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {filteredActas.map((a, idx) => (
+                                <tr key={`${a.id}-${idx}`} onClick={() => setActiveActaContext(a)} className="hover:bg-rose-50/30 transition-colors cursor-pointer group">
+                                    <td className="px-6 py-4 font-black text-rose-600">#{a.nroActa || 'S/N'}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-slate-800">{a.cliente}</div>
+                                        <div className="text-xs font-mono text-slate-500">OCI: {a.oci}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-700 font-bold">{a.trafo}</td>
+                                    <td className="px-6 py-4 text-slate-600 text-xs flex items-center justify-between">
+                                        <span>{a.dia} de {a.mes} {a.anio}</span>
+                                        <Download className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-rose-600" />
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredActas.length === 0 && <tr><td colSpan="4" className="text-center py-12 text-slate-400 italic">No se encontraron actas firmadas.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
@@ -3046,7 +3564,7 @@ export default function App() {
                     <h1 className="text-2xl font-black text-slate-800 tracking-tight hidden md:block">Dashboard</h1>
                     {isAdmin ? (
                         <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
-                            {[ {id:'map', label:'Mapa Mundial', icon:MapIcon}, {id:'kanban', label:'Tablero', icon:Columns}, {id:'gantt', label:'Cronograma', icon:Calendar}, {id:'sheet', label:'Planilla', icon:List}, {id:'vehicles', label:'Flota', icon:Truck}, {id:'vacations', label:'Vacaciones', icon:Palmtree}, {id:'history', label:'Historial', icon:History}, {id:'kpis', label:'KPIs', icon:BarChart2}, {id:'surveys', label:'Encuestas', icon:ClipboardList}, {id:'tests', label:'Ensayos', icon:FileSpreadsheet} ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
+                            {[ {id:'map', label:'Mapa Mundial', icon:MapIcon}, {id:'kanban', label:'Tablero', icon:Columns}, {id:'gantt', label:'Cronograma', icon:Calendar}, {id:'sheet', label:'Planilla', icon:List}, {id:'vehicles', label:'Flota', icon:Truck}, {id:'vacations', label:'Vacaciones', icon:Palmtree}, {id:'history', label:'Historial', icon:History}, {id:'kpis', label:'KPIs', icon:BarChart2}, {id:'surveys', label:'Encuestas', icon:ClipboardList}, {id:'tests', label:'Ensayos', icon:FileSpreadsheet}, {id:'actas', label:'Actas', icon:FileCheck} ].map(tab=>(<button key={tab.id} onClick={()=>changeTab(tab.id)} className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${activeTab===tab.id?'bg-white text-orange-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}><tab.icon className="w-4 h-4 mr-2"/> {tab.label}</button>))}
                         </div>
                     ) : (
                         <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
@@ -3088,6 +3606,8 @@ export default function App() {
                             {activeTab === 'kpis' && <KPIs services={services} vehiculosData={vehiculosData} />}
                             {activeTab === 'surveys' && <SurveyDashboard surveys={surveysData} />}
                             {activeTab === 'tests' && <EnsayosDashboard services={services} />}
+                            {activeTab === 'tests' && <EnsayosDashboard services={services} />}
+                            {activeTab === 'actas' && <ActasDashboard services={services} />}
                         </div>
                     ) : (
                         <div className="max-w-7xl mx-auto h-full">
@@ -3261,12 +3781,55 @@ export default function App() {
 
             <Modal isOpen={!!loggingHoursService} onClose={()=>setLoggingHoursService(null)} title="Cargar Horas">
                 <div className="space-y-4">
+                    {/* Selector de Tipo de Hora (Trabajo o Viaje) */}
+                    <select 
+                        className="input-field font-bold text-indigo-700" 
+                        value={dailyLogData.type || 'Trabajo'} 
+                        onChange={e=>setDailyLogData({...dailyLogData, type: e.target.value})}
+                    >
+                        <option value="Trabajo">⚙️ Horas de Trabajo</option>
+                        <option value="Viaje">🚗 Horas de Viaje</option>
+                    </select>
+
+                    {/* Selector de Personal Involucrado */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        <label className="text-[10px] font-bold text-slate-500 mb-2 block uppercase tracking-wider">
+                            Personal Involucrado
+                        </label>
+                        <div className="flex flex-col gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                            {loggingHoursService?.tecnicos?.map(techName => (
+                                <label key={techName} className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors">
+                                    <input 
+                                        type="checkbox" 
+                                        className="accent-indigo-600 w-4 h-4 cursor-pointer"
+                                        checked={techsForHours.includes(techName)}
+                                        onChange={(e) => {
+                                            if(e.target.checked) {
+                                                setTechsForHours([...techsForHours, techName]);
+                                            } else {
+                                                setTechsForHours(techsForHours.filter(t => t !== techName));
+                                            }
+                                        }}
+                                    />
+                                    <span className="text-sm font-medium text-slate-700">{techName}</span>
+                                </label>
+                            ))}
+                            {(!loggingHoursService?.tecnicos || loggingHoursService.tecnicos.length === 0) && (
+                                <span className="text-xs text-slate-400 italic">No hay técnicos asignados a este servicio.</span>
+                            )}
+                        </div>
+                    </div>
+
                     <input type="date" className="input-field" value={dailyLogData.date} onChange={e=>setDailyLogData({...dailyLogData, date:e.target.value})}/>
+                    
                     <div className="grid grid-cols-2 gap-2">
                         <input type="time" className="input-field" value={dailyLogData.start} onChange={e=>setDailyLogData({...dailyLogData, start:e.target.value})}/>
                         <input type="time" className="input-field" value={dailyLogData.end} onChange={e=>setDailyLogData({...dailyLogData, end:e.target.value})}/>
                     </div>
-                    <button onClick={handleLogHours} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Registrar</button>
+                    
+                    <button onClick={handleLogHours} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
+                        Registrar
+                    </button>
                 </div>
             </Modal>
 

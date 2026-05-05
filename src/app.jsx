@@ -278,6 +278,12 @@ const GlobalStyles = () => (
     .survey-input{background-color:transparent!important;border:none!important;border-bottom:1px solid #dadce0!important;border-radius:0!important;padding:8px 0!important;box-shadow:none!important;color:#202124!important;}
     .survey-input:focus{border-bottom:2px solid #673ab7!important;box-shadow:none!important;}
     .survey-radio-group input[type="radio"]{accent-color:#673ab7!important;width:20px;height:20px;}
+    
+    /* REGLA INFALIBLE PARA LOS ICONOS DEL LOGIN */
+    #login-box input[type="password"],
+    #login-box select {
+        padding-left: 2.8rem !important;
+    }
   `}</style>
 );
 
@@ -2590,142 +2596,153 @@ const LoginScreen = ({ onLogin, tecnicosData }) => {
             try {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config');
                 const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) { setAdminConfig(docSnap.data()); } else { setAdminSetupRequired(true); }
-            } catch (e) {}
+                if (docSnap.exists()) { 
+                    setAdminConfig(docSnap.data()); 
+                } else { 
+                    setAdminSetupRequired(true); 
+                }
+            } catch (e) {
+                console.error("Error checking admin:", e);
+            }
         };
         checkAdmin();
     }, []);
 
     const handleAdminSetup = async () => {
-        if (password.length < 6) { setError('Contraseña > 6 caracteres'); return; }
+        if (password.length < 6) { 
+            setError('La contraseña debe tener al menos 6 caracteres'); 
+            return; 
+        }
         setLoading(true);
         try {
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admin_settings', 'config'), { password: password });
-            setAdminConfig({ password }); setAdminSetupRequired(false); setPassword('');
-        } catch (e) { setError("Error"); }
-        setLoading(false);
-    };
-
-    const handleLogin = () => {
-        if(role === 'admin') {
-            if(adminSetupRequired) { handleAdminSetup(); return; }
-            const validPass = adminConfig ? adminConfig.password : 'admin123';
-            if(password === validPass) { onLogin({ name: 'Administrador', role: 'admin' }); } else { setError('Contraseña incorrecta'); }
-        } else {
-            const tech = tecnicosData.find(t => t.name === selectedTechName);
-            if(tech && tech.password === password) { onLogin({ name: selectedTechName, role: 'tech', phone: tech.phone }); } else { setError('Credenciales inválidas'); }
+            setAdminConfig({ password }); 
+            setAdminSetupRequired(false); 
+            setPassword('');
+            setError('');
+        } catch (e) { 
+            setError("Error al configurar el administrador."); 
+        } finally {
+            setLoading(false);
         }
     };
 
-    const sortedTecnicos = useMemo(() => [...tecnicosData].sort((a, b) => a.name.localeCompare(b.name)), [tecnicosData]);
+    const handleLogin = () => {
+        setError('');
+        
+        if (role === 'admin') {
+            if (adminSetupRequired) { 
+                handleAdminSetup(); 
+                return; 
+            }
+            const validPass = adminConfig ? adminConfig.password : 'admin123';
+            if (password === validPass) { 
+                onLogin({ name: 'Administrador', role: 'admin' }); 
+            } else { 
+                setError('Contraseña incorrecta'); 
+            }
+        } else {
+            if (!selectedTechName) {
+                setError('Por favor, selecciona tu usuario');
+                return;
+            }
+            const tech = tecnicosData.find(t => t.name === selectedTechName);
+            if (tech && tech.password === password) { 
+                onLogin({ name: selectedTechName, role: 'tech', phone: tech.phone }); 
+            } else { 
+                setError('Credenciales inválidas'); 
+            }
+        }
+    };
+
+    const sortedTecnicos = useMemo(() => {
+        return [...(tecnicosData || [])].sort((a, b) => a.name.localeCompare(b.name));
+    }, [tecnicosData]);
 
     return (
         <div className="min-h-screen app-background flex items-center justify-center p-4">
             <div className="absolute inset-0 app-overlay"></div>
             <GlobalStyles />
-            <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 relative z-10">
-                <div className="text-center mb-10"><h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Planificación<br/><span className="text-orange-600">Postventa</span></h1></div>
+            {/* AQUÍ ESTÁ LA MAGIA: id="login-box" */}
+            <div id="login-box" className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 relative z-10">
+                <div className="text-center mb-10">
+                    <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">
+                        Planificación<br/><span className="text-orange-600">Postventa</span>
+                    </h1>
+                </div>
+
                 {adminSetupRequired && role === 'admin' ? (
-                    <div className="space-y-4"><input type="password" placeholder="Nueva Contraseña" className="input-field" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={handleAdminSetup} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Guardar</button></div>
+                    <div className="space-y-4">
+                        <input 
+                            type="password" 
+                            placeholder="Nueva Contraseña" 
+                            className="input-field" 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)}
+                        />
+                        <button 
+                            onClick={handleAdminSetup} 
+                            disabled={loading}
+                            className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold disabled:opacity-50"
+                        >
+                            {loading ? 'Guardando...' : 'Guardar'}
+                        </button>
+                    </div>
                 ) : (
                     <div className="space-y-5">
                         <div className="btn-bubble-container">
-                            <button onClick={() => { setRole('admin'); setError(''); }} className={`btn-bubble ${role === 'admin' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Admin</button>
-                            <button onClick={() => { setRole('tech'); setError(''); }} className={`btn-bubble ${role === 'tech' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Técnico</button>
+                            <button onClick={() => { setRole('admin'); setError(''); setPassword(''); }} className={`btn-bubble ${role === 'admin' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Admin</button>
+                            <button onClick={() => { setRole('tech'); setError(''); setPassword(''); }} className={`btn-bubble ${role === 'tech' ? 'btn-bubble-active' : 'btn-bubble-inactive'}`}>Técnico</button>
                         </div>
-                        {role === 'tech' && (<div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Briefcase className="h-5 w-5 text-slate-400" /></div><select className="input-field pl-10" value={selectedTechName} onChange={(e) => setSelectedTechName(e.target.value)}><option value="">Selecciona tu usuario...</option>{sortedTecnicos.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}</select></div>)}
-                        <div className="relative group"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-slate-400" /></div><input type="password" placeholder="Contraseña" className="input-field pl-10" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-                        {error && <p className="text-rose-500 text-sm text-center font-medium bg-rose-50 py-2 rounded-lg">{error}</p>}
-                        <button onClick={handleLogin} className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-all">Ingresar</button>
+
+                        {/* SELECTOR DE TÉCNICO */}
+                        {role === 'tech' && (
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-20">
+                                    <Briefcase className="h-5 w-5 text-slate-400" />
+                                </div>
+                                <select 
+                                    className="input-field relative z-10"
+                                    value={selectedTechName} 
+                                    onChange={(e) => setSelectedTechName(e.target.value)}
+                                >
+                                    <option value="" disabled>Selecciona tu usuario...</option>
+                                    {sortedTecnicos.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* CAMPO DE CONTRASEÑA */}
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-20">
+                                <Lock className="h-5 w-5 text-slate-400" />
+                            </div>
+                            <input 
+                                type="password" 
+                                placeholder="Contraseña" 
+                                className="input-field relative z-10"
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            />
+                        </div>
+
+                        {typeof error === 'string' && error.length > 0 && (
+                            <p className="text-rose-500 text-sm text-center font-medium bg-rose-50 py-2 rounded-lg">
+                                {error}
+                            </p>
+                        )}
+                        
+                        <button 
+                            onClick={handleLogin} 
+                            disabled={loading}
+                            className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-orange-700 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? 'Ingresando...' : 'Ingresar'}
+                        </button>
                     </div>
                 )}
             </div>
-        </div>
-    );
-};
-
-
-// ============================================================================
-// MODULO DE ACTAS DE SERVICIO
-// ============================================================================
-
-// 1. Componente de Firma Digital (Canvas) - TAMAÑO AMPLIADO
-const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
-    const canvasRef = useRef(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-
-    useEffect(() => {
-        if (initialData && canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0);
-            img.src = initialData;
-        }
-    }, [initialData]);
-
-    const startDrawing = (e) => {
-        if (readOnly) return;
-        const { offsetX, offsetY } = getCoordinates(e);
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.beginPath();
-        ctx.moveTo(offsetX, offsetY);
-        setIsDrawing(true);
-    };
-
-    const draw = (e) => {
-        if (!isDrawing || readOnly) return;
-        const { offsetX, offsetY } = getCoordinates(e);
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.lineTo(offsetX, offsetY);
-        ctx.stroke();
-    };
-
-    const stopDrawing = () => {
-        if (isDrawing && !readOnly) {
-            setIsDrawing(false);
-            if (onSaveSignature) onSaveSignature(canvasRef.current.toDataURL());
-        }
-    };
-
-    const getCoordinates = (event) => {
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        if (event.touches && event.touches.length > 0) {
-            return {
-                offsetX: event.touches[0].clientX - rect.left,
-                offsetY: event.touches[0].clientY - rect.top
-            };
-        }
-        return {
-            offsetX: event.nativeEvent.offsetX,
-            offsetY: event.nativeEvent.offsetY
-        };
-    };
-
-    const clear = () => {
-        if (readOnly) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (onSaveSignature) onSaveSignature(null);
-    };
-
-    return (
-        <div className="flex flex-col items-center w-full">
-            <canvas
-                ref={canvasRef}
-                width={320}  /* ANTES: 300 - Aumentado al máximo permitido por la grilla */
-                height={140} /* ANTES: 80 - Casi el doble de alto para más comodidad */
-                style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
-                className={`border border-slate-300 border-b-black w-full max-w-[320px] rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
-                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
-            />
-            {!readOnly && (
-                <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
-                    Limpiar firma
-                </button>
-            )}
         </div>
     );
 };

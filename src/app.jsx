@@ -279,7 +279,6 @@
             .survey-input:focus{border-bottom:2px solid #673ab7!important;box-shadow:none!important;}
             .survey-radio-group input[type="radio"]{accent-color:#673ab7!important;width:20px;height:20px;}
             
-            /* REGLA INFALIBLE PARA LOS ICONOS DEL LOGIN */
             #login-box input[type="password"],
             #login-box select {
                 padding-left: 2.8rem !important;
@@ -2819,7 +2818,7 @@
                         onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
                     />
                     {!readOnly && (
-                        <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-black mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
+                        <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-white mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
                             Limpiar firma
                         </button>
                     )}

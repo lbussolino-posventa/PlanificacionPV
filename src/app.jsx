@@ -3595,7 +3595,7 @@
                 if (!lastSavedService) return;
                 const tech = tecnicosData.find(t => t.name === techName);
                 if (!tech || !tech.phone) { showNotification(`Sin teléfono para ${techName}`, "error"); return; }
-                const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n>> Iniciar en App al llegar.`;
+                const msg = `--- TICKET DE SERVICIO ---\nTECNICO: ${techName}\nCLIENTE: ${lastSavedService.cliente}\nINICIO: ${formatDate(lastSavedService.fInicio)}\nFIN: ${formatDate(lastSavedService.fFin)}\nTAREA: ${lastSavedService.tipoTrabajo === 'Otro' && lastSavedService.tipoTrabajoOtro ? lastSavedService.tipoTrabajoOtro : lastSavedService.tipoTrabajo}\n>> Iniciar en App - https://planificacion-pv.vercel.app/.`;
                 window.open(`https://wa.me/${tech.phone}?text=${encodeURIComponent(msg)}`, '_blank');
             };
 

@@ -2826,7 +2826,7 @@
             );
         };
         
-        // 2. Componente Editor y Generador de PDF del Acta
+        // 2. Componente Editor y Generador del Acta
         const ActaEditor = ({ service, actaData, onSave, onBack, readOnly = false }) => {
             const defaultDate = new Date();
             const [viewMode, setViewMode] = useState('form'); // 'form' para celular, 'pdf' para vista previa A4
@@ -2876,7 +2876,6 @@
                 setIsSaving(false);
             };
 
-            // Usamos EXACTAMENTE tu lógica de descarga que funcionaba bien
             const handleDownloadPDF = () => {
                 const element = document.getElementById('acta-printable');
                 if (!window.html2pdf) return alert("Cargando librería PDF...");
@@ -2929,7 +2928,7 @@
                     <div className="flex flex-col sm:flex-row justify-between items-center mb-4 no-print gap-4">
                         <button onClick={onBack} className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-white rounded font-bold text-sm hover:bg-slate-800 w-full sm:w-auto justify-center"><ArrowLeft size={16} /> Volver</button>
                         
-                        {/* SELECTOR DE VISTA (MODO CELULAR / MODO PDF) */}
+                        {/* SELECTOR DE VISTA */}
                         <div className="flex bg-slate-300 p-1 rounded-lg w-full sm:w-auto">
                             <button onClick={() => setViewMode('form')} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'form' ? 'bg-white shadow text-blue-600' : 'text-slate-600'}`}>📱 Modo Edición</button>
                             <button onClick={() => setViewMode('pdf')} className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'pdf' ? 'bg-white shadow text-rose-600' : 'text-slate-600'}`}>📄 Vista PDF</button>
@@ -2941,9 +2940,7 @@
                         </div>
                     </div>
 
-                    {/* ========================================================================= */}
-                    {/* 1. MODO EDICIÓN MÓVIL (Formulario apilado clásico, cómodo para celulares) */}
-                    {/* ========================================================================= */}
+                    {/* 1. MODO EDICIÓN MÓVIL */}
                     <div className={`${viewMode === 'form' && !isGenerating ? 'block' : 'hidden'} no-print bg-white p-5 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto`}>
                         <div className="space-y-8">
                             <div>
@@ -3030,9 +3027,7 @@
                         </div>
                     </div>
 
-                    {/* ========================================================================= */}
-                    {/* 2. MODO VISTA PDF (TU CÓDIGO ORIGINAL INTACTO) */}
-                    {/* ========================================================================= */}
+                    {/* 2. MODO VISTA PDF (AQUÍ ESTÁN LAS CORRECCIONES DEFINTIVAS) */}
                     <div className={`${viewMode === 'pdf' || isGenerating ? 'block' : 'hidden'} w-full overflow-x-auto pb-4 custom-scrollbar`}>
                         <div id="acta-printable" className="mx-auto p-6 shadow-xl font-sans w-full max-w-[800px] h-auto min-h-[1050px] relative border border-slate-300 flex flex-col" style={{ backgroundColor: '#ffffff' }}>
                             
@@ -3072,7 +3067,7 @@
                                     border-radius: 0 !important;
                                     box-shadow: none !important;
                                     margin: 0 4px !important;
-                                    padding: 0 2px !important;
+                                    padding: 0 2px 2px 2px !important;
                                     font-family: inherit !important;
                                     font-size: 14px !important;
                                     font-weight: bold !important;
@@ -3084,12 +3079,32 @@
                                     -webkit-appearance: none !important;
                                 }
 
-                                #acta-printable input.w-lugar { width: 140px !important; }
-                                #acta-printable input.w-dia { width: 40px !important; }
-                                #acta-printable input.w-mes { width: 100px !important; }
-                                #acta-printable input.w-anio { width: 60px !important; }
-                                #acta-printable input.w-rep { width: 220px !important; }
-                                #acta-printable input.w-nro { width: 70px !important; font-weight: bold !important; }
+                                /* ESTILOS NUEVOS PARA EVITAR QUE SE CORTE EL TEXTO EN EL PDF */
+                                #acta-printable .print-inline {
+                                    display: none !important;
+                                }
+                                body.generating-pdf #acta-printable input.acta-inline-input {
+                                    display: none !important;
+                                }
+                                body.generating-pdf #acta-printable .print-inline {
+                                    display: inline-block !important;
+                                    border-bottom: 1px solid #000000 !important;
+                                    margin: 0 4px !important;
+                                    padding: 0 2px 2px 2px !important;
+                                    font-family: inherit !important;
+                                    font-size: 14px !important;
+                                    font-weight: bold !important;
+                                    text-align: center !important;
+                                    vertical-align: baseline !important;
+                                    white-space: nowrap !important;
+                                }
+
+                                #acta-printable input.w-lugar, body.generating-pdf #acta-printable .print-inline.w-lugar { min-width: 140px !important; }
+                                #acta-printable input.w-dia, body.generating-pdf #acta-printable .print-inline.w-dia   { min-width: 40px !important; }
+                                #acta-printable input.w-mes, body.generating-pdf #acta-printable .print-inline.w-mes   { min-width: 100px !important; }
+                                #acta-printable input.w-anio, body.generating-pdf #acta-printable .print-inline.w-anio  { min-width: 60px !important; }
+                                #acta-printable input.w-rep, body.generating-pdf #acta-printable .print-inline.w-rep   { min-width: 220px !important; }
+                                #acta-printable input.w-nro   { width: 70px !important; font-weight: bold !important; }
 
                                 #acta-printable textarea,
                                 #acta-printable .print-div {
@@ -3171,13 +3186,27 @@
 
                             <div className="mb-4 text-[14px] leading-8 text-left font-medium flex-1 flex flex-col">
                                 <div>
-                                    En <input type="text" className="acta-inline-input w-lugar" placeholder="lugar" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/> 
-                                    a los <input type="text" className="acta-inline-input w-dia" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/> días 
-                                    del mes de <input type="text" className="acta-inline-input w-mes" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/> 
-                                    del año <input type="text" className="acta-inline-input w-anio" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/>, 
-                                    se reúne el Sr. <input type="text" className="acta-inline-input w-rep" placeholder="representante" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/> 
-                                    en representación de <input type="text" className="acta-inline-input w-rep" placeholder="cliente" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/> 
-                                    y el señor <input type="text" className="acta-inline-input w-rep" placeholder="técnico TTE" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/> 
+                                    En <input type="text" className="acta-inline-input w-lugar" placeholder="lugar" value={acta.lugarFirma} onChange={e=>handleChange('lugarFirma', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-lugar">{acta.lugarFirma}</span> 
+                                    
+                                    a los <input type="text" className="acta-inline-input w-dia" value={acta.dia} onChange={e=>handleChange('dia', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-dia">{acta.dia}</span> 
+                                    
+                                    días del mes de <input type="text" className="acta-inline-input w-mes" value={acta.mes} onChange={e=>handleChange('mes', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-mes">{acta.mes}</span> 
+                                    
+                                    del año <input type="text" className="acta-inline-input w-anio" value={acta.anio} onChange={e=>handleChange('anio', e.target.value)} readOnly={readOnly}/>,
+                                    <span className="print-inline w-anio">{acta.anio}</span> 
+                                    
+                                    se reúne el Sr. <input type="text" className="acta-inline-input w-rep" placeholder="representante" value={acta.srCliente} onChange={e=>handleChange('srCliente', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-rep">{acta.srCliente}</span> 
+                                    
+                                    en representación de <input type="text" className="acta-inline-input w-rep" placeholder="cliente" value={acta.repCliente} onChange={e=>handleChange('repCliente', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-rep">{acta.repCliente}</span> 
+                                    
+                                    y el señor <input type="text" className="acta-inline-input w-rep" placeholder="técnico TTE" value={acta.srTte} onChange={e=>handleChange('srTte', e.target.value)} readOnly={readOnly}/>
+                                    <span className="print-inline w-rep">{acta.srTte}</span> 
+                                    
                                     en representación de TTE Transformadores para común acuerdo labrar la presente acta de los trabajos realizados:
                                 </div>
 

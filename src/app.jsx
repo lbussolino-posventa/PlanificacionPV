@@ -1580,8 +1580,10 @@
                                     if (data && data.length > 0) coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
                                 } catch (e) { console.error("Geocoding error", e); }
                             }
+                            
                             if (coords && isMounted) {
-                                addMarkerIfUnique(coords.lat, coords.lng, `<b>Cliente: ${s.cliente}</b><br><span style="font-size:10px">${s.tipoTrabajo}<br>OCI: ${s.oci}</span>`);
+                                // Usa directamente el texto de la ubicación para mantener el formato "Ciudad, Provincia, País"
+                                addMarkerIfUnique(coords.lat, coords.lng, `<b>${s.ubicacion}</b>`);
                             }
                         }
 

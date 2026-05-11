@@ -3005,29 +3005,36 @@
                                 ></textarea>
                             </div>
 
-                            <div>
-                                <h4 className="font-black text-slate-800 border-b-2 border-slate-100 pb-2 mb-4 text-lg">4. Firmas</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center">
-                                        <label className="text-sm font-bold text-slate-800 mb-2 uppercase">Firma T.T.E.</label>
+                            <div className="grid grid-cols-2 gap-16 mb-4 text-[14px] font-bold">
+                                <div>
+                                    <span>Por T.T.E:</span>
+                                    <div className="mt-1 w-full flex justify-center">
                                         <SignaturePad onSaveSignature={(sig) => handleChange('firmaTte', sig)} readOnly={readOnly} initialData={acta.firmaTte} />
-                                        <div className="w-full mt-4">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Aclaración</label>
-                                            <input type="text" className="input-field font-bold text-center mt-1" placeholder="Nombre..." value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
-                                        </div>
                                     </div>
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center">
-                                        <label className="text-sm font-bold text-slate-800 mb-2 uppercase">Firma Cliente</label>
+                                    <div className="mt-2 flex items-end">
+                                        <span className="mr-2 pb-0.5">Aclaración:</span>
+                                        <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                        {/* Elemento visible solo en el PDF */}
+                                        <span className="print-inline flex-1 text-left">{acta.aclaracionTte}</span>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <span>Por Cliente:</span>
+                                    <div className="mt-1 w-full flex justify-center">
                                         <SignaturePad onSaveSignature={(sig) => handleChange('firmaCliente', sig)} readOnly={readOnly} initialData={acta.firmaCliente} />
-                                        <div className="w-full mt-4">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Aclaración</label>
-                                            <input type="text" className="input-field font-bold text-center mt-1" placeholder="Nombre..." value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
-                                        </div>
+                                    </div>
+                                    <div className="mt-2 flex items-end">
+                                        <span className="mr-2 pb-0.5">Aclaración:</span>
+                                        <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                        {/* Elemento visible solo en el PDF */}
+                                        <span className="print-inline flex-1 text-left">{acta.aclaracionCliente}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
                     {/* 2. MODO VISTA PDF (AQUÍ ESTÁN LAS CORRECCIONES DEFINTIVAS) */}
                     <div className={`${viewMode === 'pdf' || isGenerating ? 'block' : 'hidden'} w-full overflow-x-auto pb-4 custom-scrollbar`}>

@@ -3034,7 +3034,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
                     {/* 2. MODO VISTA PDF (AQUÍ ESTÁN LAS CORRECCIONES DEFINTIVAS) */}
                     <div className={`${viewMode === 'pdf' || isGenerating ? 'block' : 'hidden'} w-full overflow-x-auto pb-4 custom-scrollbar`}>

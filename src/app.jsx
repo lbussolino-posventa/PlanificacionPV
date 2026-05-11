@@ -3013,9 +3013,8 @@
                                     </div>
                                     <div className="mt-2 flex items-end">
                                         <span className="mr-2 pb-0.5">Aclaración:</span>
-                                        <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
-                                        {/* Elemento visible solo en el PDF */}
-                                        <span className="print-inline flex-1 text-left">{acta.aclaracionTte}</span>
+                                        <input type="text" className="acta-inline-input w-aclaracion font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                        <span className="print-inline w-aclaracion text-center">{acta.aclaracionTte}</span>
                                     </div>
                                 </div>
                                 
@@ -3026,16 +3025,15 @@
                                     </div>
                                     <div className="mt-2 flex items-end">
                                         <span className="mr-2 pb-0.5">Aclaración:</span>
-                                        <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
-                                        {/* Elemento visible solo en el PDF */}
-                                        <span className="print-inline flex-1 text-left">{acta.aclaracionCliente}</span>
+                                        <input type="text" className="acta-inline-input w-aclaracion font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                        <span className="print-inline w-aclaracion text-center">{acta.aclaracionCliente}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* 2. MODO VISTA PDF (AQUÍ ESTÁN LAS CORRECCIONES DEFINTIVAS) */}
+                    {/* 2. MODO VISTA PDF */}
                     <div className={`${viewMode === 'pdf' || isGenerating ? 'block' : 'hidden'} w-full overflow-x-auto pb-4 custom-scrollbar`}>
                         <div id="acta-printable" className="mx-auto p-6 shadow-xl font-sans w-full max-w-[800px] h-auto min-h-[1050px] relative border border-slate-300 flex flex-col" style={{ backgroundColor: '#ffffff' }}>
                             
@@ -3087,7 +3085,6 @@
                                     -webkit-appearance: none !important;
                                 }
 
-                                /* ESTILOS NUEVOS PARA EVITAR QUE SE CORTE EL TEXTO EN EL PDF */
                                 #acta-printable .print-inline {
                                     display: none !important;
                                 }
@@ -3113,6 +3110,9 @@
                                 #acta-printable input.w-anio, body.generating-pdf #acta-printable .print-inline.w-anio  { min-width: 60px !important; }
                                 #acta-printable input.w-rep, body.generating-pdf #acta-printable .print-inline.w-rep   { min-width: 220px !important; }
                                 #acta-printable input.w-nro   { width: 70px !important; font-weight: bold !important; }
+                                
+                                /* CORRECCIÓN PARA LAS ACLARACIONES */
+                                #acta-printable input.w-aclaracion, body.generating-pdf #acta-printable .print-inline.w-aclaracion { min-width: 160px !important; flex: 1 !important; }
 
                                 #acta-printable textarea,
                                 #acta-printable .print-div {
@@ -3243,6 +3243,7 @@
                                     Conforme las partes se firman original y copia de un mismo tenor y a un solo efecto en el lugar y fecha arriba indicado.
                                 </div>
 
+                                {/* AQUÍ ESTABA EL ERROR PRINCIPAL: Faltaba el fallback .print-inline para html2canvas */}
                                 <div className="grid grid-cols-2 gap-16 mb-4 text-[14px] font-bold">
                                     <div>
                                         <span>Por T.T.E:</span>
@@ -3251,7 +3252,8 @@
                                         </div>
                                         <div className="mt-2 flex items-end">
                                             <span className="mr-2 pb-0.5">Aclaración:</span>
-                                            <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                            <input type="text" className="acta-inline-input w-aclaracion font-bold" value={acta.aclaracionTte} onChange={e=>handleChange('aclaracionTte', e.target.value)} readOnly={readOnly}/>
+                                            <span className="print-inline w-aclaracion text-center">{acta.aclaracionTte}</span>
                                         </div>
                                     </div>
                                     <div>
@@ -3261,7 +3263,8 @@
                                         </div>
                                         <div className="mt-2 flex items-end">
                                             <span className="mr-2 pb-0.5">Aclaración:</span>
-                                            <input type="text" className="acta-inline-input flex-1 font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                            <input type="text" className="acta-inline-input w-aclaracion font-bold" value={acta.aclaracionCliente} onChange={e=>handleChange('aclaracionCliente', e.target.value)} readOnly={readOnly}/>
+                                            <span className="print-inline w-aclaracion text-center">{acta.aclaracionCliente}</span>
                                         </div>
                                     </div>
                                 </div>

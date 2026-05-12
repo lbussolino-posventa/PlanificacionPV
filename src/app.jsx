@@ -3444,7 +3444,7 @@ const ToolsDashboard = ({ toolsData = [] }) => {
     const filteredTools = toolsData.filter(t => 
         (t.newCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.description || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ).sort((a, b) => (a.newCode || '').localeCompare(b.newCode || ''));
 
     return (
         <div className="space-y-6 animate-in fade-in h-full flex flex-col">

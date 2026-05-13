@@ -1,14 +1,14 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { 
-        Calendar, Truck, AlertTriangle, CheckCircle, BarChart2, Table, 
-        Trash2, Plus, X, Search, Edit2, LogOut, Menu, Copy, MessageCircle, Settings, 
-        Phone, Lock, UserPlus, ExternalLink, Paperclip, FileText, Image as ImageIcon, 
-        History, Eye, Save, XCircle, CheckSquare, List, MapPin, PlayCircle, Clock, Activity,
-        Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
-        Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
-        ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
-        Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon,
-        Percent, Shield, FileSpreadsheet, Folder, Loader2, AlertCircle, ArrowLeft
+            Calendar, Truck, AlertTriangle, CheckCircle, BarChart2, Table, 
+            Trash2, Plus, X, Search, Edit2, LogOut, Menu, Copy, MessageCircle, Settings, 
+            Phone, Lock, UserPlus, ExternalLink, Paperclip, FileText, Image as ImageIcon, 
+            History, Eye, Save, XCircle, CheckSquare, List, MapPin, PlayCircle, Clock, Activity,
+            Briefcase, ChevronRight, Globe, MapIcon, Filter, TrendingUp, UserCheck, CalendarPlus,
+            Zap, Users, Target, Info, HelpCircle, Key, FileCheck, Timer, FolderOpen, AlertOctagon, Cloud,
+            ShieldCheck, Loader, RotateCcw, LayoutList, Palmtree, ArrowUpDown, UserX, QrCode, Wifi, WifiOff, RefreshCw, Navigation, Layers, ChevronDown,
+            Columns, Wrench, BarChart, Factory, Mail, Share2, Star, ClipboardList, ThumbsUp, MessageSquare, Download, PieChart as PieChartIcon,
+            Percent, Shield, FileSpreadsheet, Folder, Loader2, AlertCircle, ArrowLeft, Maximize
         } from 'lucide-react';
         import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
         import { initializeApp } from 'firebase/app';
@@ -2751,12 +2751,16 @@
         const SignaturePad = ({ onSaveSignature, readOnly, initialData }) => {
             const canvasRef = useRef(null);
             const [isDrawing, setIsDrawing] = useState(false);
+            const [isExpanded, setIsExpanded] = useState(false);
 
             useEffect(() => {
                 if (initialData && canvasRef.current) {
                     const ctx = canvasRef.current.getContext('2d');
                     const img = new Image();
-                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                        ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                    };
                     img.src = initialData;
                 }
             }, [initialData]);
@@ -2785,18 +2789,25 @@
                 }
             };
 
+            // Cálculo de coordenadas ajustado para soportar el escalado por CSS
             const getCoordinates = (event) => {
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                let clientX, clientY;
                 if (event.touches && event.touches.length > 0) {
-                    return {
-                        offsetX: event.touches[0].clientX - rect.left,
-                        offsetY: event.touches[0].clientY - rect.top
-                    };
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX || event.nativeEvent.clientX;
+                    clientY = event.clientY || event.nativeEvent.clientY;
                 }
+
                 return {
-                    offsetX: event.nativeEvent.offsetX,
-                    offsetY: event.nativeEvent.offsetY
+                    offsetX: (clientX - rect.left) * scaleX,
+                    offsetY: (clientY - rect.top) * scaleY
                 };
             };
 
@@ -2809,21 +2820,54 @@
             };
 
             return (
-                <div className="flex flex-col items-center w-full">
-                    <canvas
-                       ref={canvasRef}
-                        width={320}  /* ANTES: 300 - Aumentado al máximo permitido por la grilla */
-                        height={140} /* ANTES: 80 - Casi el doble de alto para más comodidad */
-                        style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
-                        className={`border border-slate-300 border-b-black w-full max-w-[320px] rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
-                        onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
-                        onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
-                    />
-                    {!readOnly && (
-                        <button type="button" onClick={clear} data-html2canvas-ignore="true" className="text-[10px] text-white mt-2 font-bold no-print underline hover:text-rose-600 transition-colors">
-                            Limpiar firma
-                        </button>
+                <div className={isExpanded ? "fixed inset-0 z-[200] bg-slate-900/95 flex flex-col items-center justify-center p-4 sm:p-8 backdrop-blur-sm" : "flex flex-col items-center w-full relative group"}>
+                    
+                    {/* Botonera superior al expandir */}
+                    {isExpanded && (
+                        <div className="w-full max-w-[600px] flex justify-between items-center mb-4 text-white">
+                            <h3 className="font-bold text-lg">Firma Digital</h3>
+                            <button type="button" onClick={() => setIsExpanded(false)} className="p-2 bg-rose-500 rounded-full hover:bg-rose-600 transition-colors">
+                                <X size={20}/>
+                            </button>
+                        </div>
                     )}
+                    
+                    <div className={`relative flex justify-center ${isExpanded ? 'w-full max-w-[600px]' : 'w-full max-w-[320px]'}`}>
+                        <canvas
+                            ref={canvasRef}
+                            width={320}  
+                            height={140} 
+                            style={{ backgroundColor: '#ffffff', touchAction: 'none' }}
+                            className={`border border-slate-300 w-full rounded shadow-inner ${readOnly ? 'cursor-default' : 'cursor-crosshair'} ${isExpanded ? 'border-4 border-slate-400 !h-auto' : 'border-b-black !h-[140px]'}`}
+                            onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
+                            onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
+                        />
+                        
+                        {/* Botón de ampliar, visible solo si no está en modo lectura ni expandido */}
+                        {!readOnly && !isExpanded && (
+                            <button 
+                                type="button" 
+                                onClick={() => setIsExpanded(true)} 
+                                className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-md shadow backdrop-blur-sm text-slate-600 hover:text-orange-600 transition-colors opacity-100" 
+                                title="Ampliar Firma"
+                            >
+                                <Maximize className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className={`flex gap-4 mt-2 ${isExpanded ? 'w-full max-w-[600px] mt-6' : ''}`}>
+                        {!readOnly && (
+                            <button type="button" onClick={clear} data-html2canvas-ignore="true" className={`font-bold no-print transition-colors ${isExpanded ? 'bg-slate-700 text-white hover:bg-slate-600 py-3 rounded-xl flex-1 text-sm' : 'text-[10px] text-slate-500 underline hover:text-rose-600 mt-2'}`}>
+                                Limpiar firma
+                            </button>
+                        )}
+                        {isExpanded && !readOnly && (
+                            <button type="button" onClick={() => setIsExpanded(false)} className="flex-1 bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg text-sm hover:bg-emerald-700 transition-colors">
+                                Confirmar Firma
+                            </button>
+                        )}
+                    </div>
                 </div>
             );
         };
